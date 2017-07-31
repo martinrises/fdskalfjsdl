@@ -13,12 +13,12 @@ batch_size = 5
 num_batches = total_series_length//batch_size//truncated_backprop_length
 
 def generateData():
-    x = np.array(np.random.choice(2, total_series_length, p=[0.5, 0.5]))
-    y = np.roll(x, echo_step)
-    y[0:echo_step] = 0
+    x = np.array(np.random.choice(2, total_series_length, p=[0.5, 0.5])) # 概率各为0.5，随机生成0、1，生成数组
+    y = np.roll(x, echo_step) # 将x整体向后挪动echo_step
+    y[0:echo_step] = 0 # 从之前数组的后echo_step位挪到前面来的数都重置。
 
     x = x.reshape((batch_size, -1))  # The first index changing slowest, subseries as rows
-    y = y.reshape((batch_size, -1))
+    y = y.reshape((batch_size, -1)) # 将数组变形为为batch_size行，总维数/行数 列的数组
 
     return (x, y)
 
@@ -34,24 +34,24 @@ W2 = tf.Variable(np.random.rand(state_size, num_classes),dtype=tf.float32)
 b2 = tf.Variable(np.zeros((1,num_classes)), dtype=tf.float32)
 
 # Unpack columns
-inputs_series = tf.unpack(batchX_placeholder, axis=1)
-labels_series = tf.unpack(batchY_placeholder, axis=1)
+inputs_series = tf.unstack(batchX_placeholder, axis=1) # 过时方法，tf.unstack()代替，axis = 1 -> 按列解包
+labels_series = tf.unstack(batchY_placeholder, axis=1)
 
 # Forward pass
 current_state = init_state
 states_series = []
 for current_input in inputs_series:
     current_input = tf.reshape(current_input, [batch_size, 1])
-    input_and_state_concatenated = tf.concat(1, [current_input, current_state])  # Increasing number of columns
+    input_and_state_concatenated = tf.concat([current_input, current_state], 1)  # Increasing number of columns ，在第二个维度上连接
 
-    next_state = tf.tanh(tf.matmul(input_and_state_concatenated, W) + b)  # Broadcasted addition
+    next_state = tf.tanh(tf.matmul(input_and_state_concatenated, W) + b)  # Broadcasted addition； matmul 矩阵乘法
     states_series.append(next_state)
     current_state = next_state
 
 logits_series = [tf.matmul(state, W2) + b2 for state in states_series] #Broadcasted addition
 predictions_series = [tf.nn.softmax(logits) for logits in logits_series]
 
-losses = [tf.nn.sparse_softmax_cross_entropy_with_logits(logits, labels) for logits, labels in zip(logits_series,labels_series)]
+losses = [tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels, logits=logits) for logits, labels in zip(logits_series,labels_series)]
 total_loss = tf.reduce_mean(losses)
 
 train_step = tf.train.AdagradOptimizer(0.3).minimize(total_loss)
