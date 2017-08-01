@@ -2,7 +2,9 @@ from __future__ import print_function, division
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
+import pandas as pd
 
+feature_size = 6
 num_epochs = 100
 total_series_length = 50000
 truncated_backprop_length = 15
@@ -13,16 +15,21 @@ batch_size = 5
 num_batches = total_series_length//batch_size//truncated_backprop_length
 
 def generateData():
-    x = np.array(np.random.choice(2, total_series_length, p=[0.5, 0.5])) # 概率各为0.5，随机生成0、1，生成数组
-    y = np.roll(x, echo_step) # 将x整体向后挪动echo_step
-    y[0:echo_step] = 0 # 从之前数组的后echo_step位挪到前面来的数都重置。
+    #――――――――――――――――――导入数据――――――――――――――――――――――
+    f=open('labeled_daily_price.csv') 
+    df=pd.read_csv(f)     #读入股票数据
+    x = df.iloc[:, 1:7]
+    y = df.iloc[:, 7:8]
 
-    x = x.reshape((batch_size, -1))  # The first index changing slowest, subseries as rows
-    y = y.reshape((batch_size, -1)) # 将数组变形为为batch_size行，总维数/行数 列的数组
+    x = np.asarray(x)
+    y = np.asarray(y)
+
+    x = x.reshape((batch_size, -1, feature_size))  # The first index changing slowest, subseries as rows
+    y = y.reshape((batch_size, -1)) # 将数组变形为batch_size行，总维数/行数 列的数组
 
     return (x, y)
 
-batchX_placeholder = tf.placeholder(tf.float32, [batch_size, truncated_backprop_length])
+batchX_placeholder = tf.placeholder(tf.float32, [batch_size, truncated_backprop_length, feature_size])
 batchY_placeholder = tf.placeholder(tf.int32, [batch_size, truncated_backprop_length])
 
 init_state = tf.placeholder(tf.float32, [batch_size, state_size])
@@ -32,8 +39,8 @@ b = tf.Variable(np.zeros((1,state_size)), dtype=tf.float32)
 
 W2 = tf.Variable(np.random.rand(state_size, num_classes),dtype=tf.float32)
 b2 = tf.Variable(np.zeros((1,num_classes)), dtype=tf.float32)
-
 # Unpack columns
+
 inputs_series = tf.unstack(batchX_placeholder, axis=1) # 过时方法，tf.unstack()代替，axis = 1 -> 按列解包
 labels_series = tf.unstack(batchY_placeholder, axis=1)
 
