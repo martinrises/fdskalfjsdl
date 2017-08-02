@@ -4,8 +4,8 @@ import math
 trend_down = 0
 trend_shake = 1
 trend_up = 2
-meta_trend_days = 5
-rate_threshold = 0.2
+meta_trend_days = 15
+rate_threshold = 0.20
 
 class DailyRecord:
     def __init__(self, open, close, high, low, turnover, volume):
