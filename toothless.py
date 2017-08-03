@@ -42,12 +42,10 @@ def get_test_data(time_step=20,test_begin=2500):
     size=(len(normalized_test_data)+time_step-1)//time_step  #有size个sample 
     test_x,test_y=[],[]  
     for i in range(size-1):
-       x=normalized_test_data[i*time_step:(i+1)*time_step,:input_size]
-       y=normalized_test_data[i*time_step:(i+1)*time_step,input_size]
+       x=normalized_test_data[i:i+time_step,:input_size]
+       y=normalized_test_data[i:i+time_step,input_size,np.newaxis]
        test_x.append(x.tolist())
-       test_y.extend(y)
-       test_x.append((normalized_test_data[(i+1)*time_step:,:input_size]).tolist())
-       test_y.extend((normalized_test_data[(i+1)*time_step:,input_size]).tolist())
+       test_y.append(y.tolist())
     return mean,std,test_x,test_y
 
 
@@ -104,7 +102,7 @@ def train_lstm(batch_size=80,time_step=20,train_begin=0,train_end=2500):
         sess.run(tf.global_variables_initializer())
         # saver.restore(sess, module_file)
         #重复训练10000次
-        for i in range(20):
+        for i in range(2000):
             for step in range(len(batch_index)-1):
                 _,loss_=sess.run([train_op,loss],feed_dict={X:train_x[batch_index[step]:batch_index[step+1]],Y:train_y[batch_index[step]:batch_index[step+1]]})
             print(i,loss_)
@@ -121,10 +119,11 @@ def prediction(time_step=20):
     X=tf.placeholder(tf.float32, shape=[None,time_step,input_size])
     mean,std,test_x,test_y=get_test_data(time_step)
     pred,_=lstm(X, "predict")
-    saver=tf.train.Saver(tf.global_variables())
     with tf.Session() as sess:
         #参数恢复
-        saver.restore(sess, model_file_path) 
+        sess.run(tf.global_variables_initializer())
+        new_saver = tf.train.import_meta_graph('model/toothless.model.meta')
+        new_saver.restore(sess, model_file_path)
         test_predict=[]
         for step in range(len(test_x)-1):
           prob=sess.run(pred,feed_dict={X:[test_x[step]]})   
@@ -132,11 +131,13 @@ def prediction(time_step=20):
           test_predict.extend(predict)
         test_y=np.array(test_y)*std[input_size]+mean[input_size]
         test_predict=np.array(test_predict)*std[input_size]+mean[input_size]
-        acc=np.average(np.abs(test_predict-test_y[:len(test_predict)])/test_y[:len(test_predict)])  #偏差
-        #以折线图表示结果
-        plt.figure()
-        plt.plot(list(range(len(test_predict))), test_predict, color='b')
-        plt.plot(list(range(len(test_y))), test_y,  color='r')
-        plt.show()
+        # acc=np.average(np.abs(test_predict-test_y[:len(test_predict)])/test_y[:len(test_predict)])  #偏差
+        # #以折线图表示结果
+        # plt.figure()
+        # plt.plot(list(range(len(test_predict))), test_predict, color='b')
+        # plt.plot(list(range(len(test_y))), test_y,  color='r')
+        # plt.show()
+        print(test_predict)
+
 
 prediction() 
