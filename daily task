@@ -1,7 +1,8 @@
 daily task
-1. 使用tensorflow原生的normalization
-2. 添加feature:两融余额
-3. 让toothless deep起来
+1. 参照tensorflow的教程，规范toothless
+2. 使用tensorflow原生的normalization
+3. 添加feature:两融余额
+4. 使用以下tricky的策略，提高交易的盈利效率
 
 
 ======== DONE =========
