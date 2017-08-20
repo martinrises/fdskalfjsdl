@@ -1,143 +1,401 @@
-import pandas as pd
+# Copyright 2015 The TensorFlow Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+
+"""Example / benchmark for building a PTB LSTM model.
+
+Trains the model described in:
+(Zaremba, et. al.) Recurrent Neural Network Regularization
+http://arxiv.org/abs/1409.2329
+
+There are 3 supported model configurations:
+===========================================
+| config | epochs | train | valid  | test
+===========================================
+| small  | 13     | 37.99 | 121.39 | 115.91
+| medium | 39     | 48.45 |  86.16 |  82.07
+| large  | 55     | 37.87 |  82.62 |  78.29
+The exact results may vary depending on the random initialization.
+
+The hyperparameters used in the model:
+- init_scale - the initial scale of the weights
+- learning_rate - the initial value of the learning rate
+- max_grad_norm - the maximum permissible norm of the gradient
+- num_layers - the number of LSTM layers
+- num_steps - the number of unrolled steps of LSTM
+- hidden_size - the number of LSTM units
+- max_epoch - the number of epochs trained with the initial learning rate
+- max_max_epoch - the total number of epochs for training
+- keep_prob - the probability of keeping weights in the dropout layer
+- lr_decay - the decay of the learning rate for each epoch after "max_epoch"
+- batch_size - the batch size
+
+The data required for this example is in the data/ dir of the
+PTB dataset from Tomas Mikolov's webpage:
+
+$ wget http://www.fit.vutbr.cz/~imikolov/rnnlm/simple-examples.tgz
+$ tar xvf simple-examples.tgz
+
+To run:
+
+$ python ptb_word_lm.py --data_path=simple-examples/data/
+python ptb_word_lm.py --data_path=simple-examples/data/
+"""
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+import inspect
+import time
+
 import numpy as np
-import matplotlib.pyplot as plt
 import tensorflow as tf
 
-#定义常量
-model_file_path='./model/toothless.model'
-rnn_unit=10       #hidden layer units
-input_size=6
-output_size=1
-lr=0.0006         #学习率
-#――――――――――――――――――导入数据――――――――――――――――――――――
-f=open('labeled_daily_price.csv') 
-df=pd.read_csv(f)     #读入股票数据
-data=df.iloc[:,1:8].values  #取第3-10列
+import pandas as pd
+import reader
 
 
-#获取训练集
-def get_train_data(batch_size=60,time_step=20,train_begin=0,train_end=2500):
-    batch_index=[]
-    data_train=data[train_begin:train_end]
-    normalized_train_data=(data_train-np.mean(data_train,axis=0))/np.std(data_train,axis=0)  #标准化
-    train_x,train_y=[],[]   #训练集 
-    for i in range(len(normalized_train_data)-time_step):
-       if i % batch_size==0:
-           batch_index.append(i)
-       x=normalized_train_data[i:i+time_step,:input_size]
-       y=normalized_train_data[i:i+time_step,input_size,np.newaxis]
-       train_x.append(x.tolist())
-       train_y.append(y.tolist())
-    batch_index.append((len(normalized_train_data)-time_step))
-    return batch_index,train_x,train_y
+flags = tf.flags
+logging = tf.logging
+
+flags.DEFINE_string(
+    "model", "small",
+    "A type of model. Possible options are: small, medium, large.")
+flags.DEFINE_string("data_path", None,
+                    "Where the training/test data is stored.")
+flags.DEFINE_string("save_path", None,
+                    "Model output directory.")
+flags.DEFINE_bool("use_fp16", False,
+                  "Train using 16-bit floats instead of 32bit floats")
+
+FLAGS = flags.FLAGS
 
 
-
-#获取测试集
-def get_test_data(time_step=20,test_begin=2500):
-    data_test=data[test_begin:]
-    mean=np.mean(data_test,axis=0)
-    std=np.std(data_test,axis=0)
-    normalized_test_data=(data_test-mean)/std  #标准化
-    size=(len(normalized_test_data)+time_step-1)//time_step  #有size个sample 
-    test_x,test_y=[],[]  
-    for i in range(size-1):
-       x=normalized_test_data[i:i+time_step,:input_size]
-       y=normalized_test_data[i:i+time_step,input_size,np.newaxis]
-       test_x.append(x.tolist())
-       test_y.append(y.tolist())
-    return mean,std,test_x,test_y
+def data_type():
+  return tf.float16 if FLAGS.use_fp16 else tf.float32
 
 
+class PTBInput(object):
+  """The input data."""
 
-#――――――――――――――――――定义神经网络变量――――――――――――――――――
-#输入层、输出层权重、偏置
-
-weights={
-         'in':tf.Variable(tf.random_normal([input_size,rnn_unit])),
-         'out':tf.Variable(tf.random_normal([rnn_unit,1]))
-        }
-biases={
-        'in':tf.Variable(tf.constant(0.1,shape=[rnn_unit,])),
-        'out':tf.Variable(tf.constant(0.1,shape=[1,]))
-       }
-
-#――――――――――――――――――定义神经网络变量――――――――――――――――――
-def lstm(X, action_name):     
-    batch_size=tf.shape(X)[0]
-    time_step=tf.shape(X)[1]
-    w_in=weights['in']
-    b_in=biases['in']  
-    input=tf.reshape(X,[-1,input_size])  #需要将tensor转成2维进行计算，计算后的结果作为隐藏层的输入
-    input_rnn=tf.matmul(input,w_in)+b_in
-    input_rnn=tf.reshape(input_rnn,[-1,time_step,rnn_unit])  #将tensor转成3维，作为lstm cell的输入
-    with tf.variable_scope(action_name):
-        cell=tf.nn.rnn_cell.BasicLSTMCell(rnn_unit)
-        init_state=cell.zero_state(batch_size,dtype=tf.float32)
-        output_rnn,final_states=tf.nn.dynamic_rnn(cell, input_rnn,initial_state=init_state, dtype=tf.float32)  #output_rnn是记录lstm每个输出节点的结果，final_states是最后一个cell的结果
-        output=tf.reshape(output_rnn,[-1,rnn_unit]) #作为输出层的输入
-        w_out=weights['out']
-        b_out=biases['out']
-        pred=tf.matmul(output,w_out)+b_out
-        return pred,final_states
+  def __init__(self, config, data, name=None):
+    self.batch_size = batch_size = config.batch_size
+    self.num_steps = num_steps = config.num_steps
+    self.epoch_size = ((len(data) // batch_size) - 1) // num_steps
+    data_x = data[:reader.feature_size]
+    data_y = data[-1]
+    self.input_data, self.targets = reader.ptb_producer(
+      data_x, data_y, batch_size, num_steps, name=name)
 
 
+class PTBModel(object):
+  """The PTB model."""
 
-#――――――――――――――――――训练模型――――――――――――――――――
-def train_lstm(batch_size=80,time_step=20,train_begin=0,train_end=2500):
-    X=tf.placeholder(tf.float32, shape=[None,time_step,input_size])
-    Y=tf.placeholder(tf.float32, shape=[None,time_step,output_size])
-    batch_index,train_x,train_y=get_train_data(batch_size,time_step,train_begin,train_end)
-    print('batch_index = {}'.format(batch_index))
-    print('train_x[0] = {}'.format(train_x[0]))
-    print('train_y[0] = {}'.format(train_y[0]))
+  def __init__(self, is_training, config, input_):
+    self._input = input_  # shape:[batch_size, num_steps, ...]
 
-    pred,_=lstm(X, "train")
-    #损失函数
-    loss=tf.reduce_mean(tf.square(tf.reshape(pred,[-1])-tf.reshape(Y, [-1])))
-    train_op=tf.train.AdamOptimizer(lr).minimize(loss)
-    saver=tf.train.Saver(tf.global_variables(),max_to_keep=15)
-    # module_file = tf.train.latest_checkpoint(model_file_path)    
-    with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
-        # saver.restore(sess, module_file)
-        #重复训练10000次
-        for i in range(2000):
-            for step in range(len(batch_index)-1):
-                _,loss_=sess.run([train_op,loss],feed_dict={X:train_x[batch_index[step]:batch_index[step+1]],Y:train_y[batch_index[step]:batch_index[step+1]]})
-            print(i,loss_)
-            # if i % 200==0:
-            #     print("保存模型：",saver.save(sess,'stock2.model',global_step=i))
-        saver.save(sess,model_file_path)
+    batch_size = input_.batch_size
+    num_steps = input_.num_steps
+    size = config.hidden_size
+    vocab_size = config.vocab_size
+
+    # Slightly better results can be obtained with forget gate biases
+    # initialized to 1 but the hyperparameters of the model would need to be
+    # different than reported in the paper.
+    def lstm_cell():
+      # With the latest TensorFlow source code (as of Mar 27, 2017),
+      # the BasicLSTMCell will need a reuse parameter which is unfortunately not
+      # defined in TensorFlow 1.0. To maintain backwards compatibility, we add
+      # an argument check here:
+      if 'reuse' in inspect.getargspec(
+          tf.contrib.rnn.BasicLSTMCell.__init__).args:
+        return tf.contrib.rnn.BasicLSTMCell(
+            size, forget_bias=0.0, state_is_tuple=True,
+            reuse=tf.get_variable_scope().reuse)
+      else:
+        return tf.contrib.rnn.BasicLSTMCell(
+            size, forget_bias=0.0, state_is_tuple=True)
+    attn_cell = lstm_cell # closure，f返回一个BaseLSTMCell
+    if is_training and config.keep_prob < 1: # keep_prob：在dropout的时候是否保持weights；如果小于1，就用Dropout包括一层。
+      def attn_cell():
+        return tf.contrib.rnn.DropoutWrapper(
+            lstm_cell(), output_keep_prob=config.keep_prob)
+    cell = tf.contrib.rnn.MultiRNNCell(
+        [attn_cell() for _ in range(config.num_layers)], state_is_tuple=True)  # 添加hidden layers
+
+    self._initial_state = cell.zero_state(batch_size, data_type())
+    inputs = input_.input_data # 获取输入参数
+
+    if is_training and config.keep_prob < 1:
+      inputs = tf.nn.dropout(inputs, config.keep_prob)
+
+    # Simplified version of models/tutorials/rnn/rnn.py's rnn().
+    # This builds an unrolled LSTM for tutorial purposes only.
+    # In general, use the rnn() or state_saving_rnn() from rnn.py.
+    #
+    # The alternative version of the code below is:
+    #
+    # inputs = tf.unstack(inputs, num=num_steps, axis=1)
+    # outputs, state = tf.contrib.rnn.static_rnn(
+    #     cell, inputs, initial_state=self._initial_state)
+    outputs = []
+    state = self._initial_state
+    with tf.variable_scope("RNN"):
+      for time_step in range(num_steps):
+        if time_step > 0: tf.get_variable_scope().reuse_variables() # 接着之前训练过的Variable继续训练
+        (cell_output, state) = cell(inputs[:, time_step, :], state)
+        outputs.append(cell_output)
+
+    output = tf.reshape(tf.stack(axis=1, values=outputs), [-1, size])
+    softmax_w = tf.get_variable(
+        "softmax_w", [size, vocab_size], dtype=data_type())
+    softmax_b = tf.get_variable("softmax_b", [vocab_size], dtype=data_type())
+    logits = tf.matmul(output, softmax_w) + softmax_b
 
 
-train_lstm()
+    # Reshape logits to be 3-D tensor for sequence loss
+    logits = tf.reshape(logits, [batch_size, num_steps, vocab_size])
+
+    print("logits.shape = {}".format(logits.shape))
+    print("input_.targets.shape = {}".format(input_.targets.shape))
+
+    # use the contrib sequence loss and average over the batches
+    loss = tf.contrib.seq2seq.sequence_loss(
+        logits,
+        input_.targets,
+        tf.ones([batch_size, num_steps], dtype=data_type()),
+        average_across_timesteps=False,
+        average_across_batch=True
+    )
+
+    # update the cost variables
+    self._cost = cost = tf.reduce_sum(loss)
+    self._final_state = state
+
+    if not is_training:
+      return
+
+    self._lr = tf.Variable(0.0, trainable=False)
+    tvars = tf.trainable_variables()
+    grads, _ = tf.clip_by_global_norm(tf.gradients(cost, tvars),
+                                      config.max_grad_norm)
+    optimizer = tf.train.GradientDescentOptimizer(self._lr)
+    self._train_op = optimizer.apply_gradients(
+        zip(grads, tvars),
+        global_step=tf.contrib.framework.get_or_create_global_step())
+
+    self._new_lr = tf.placeholder(
+        tf.float32, shape=[], name="new_learning_rate")
+    self._lr_update = tf.assign(self._lr, self._new_lr)
+
+  def assign_lr(self, session, lr_value):
+    session.run(self._lr_update, feed_dict={self._new_lr: lr_value})
+
+  @property
+  def input(self):
+    return self._input
+
+  @property
+  def initial_state(self):
+    return self._initial_state
+
+  @property
+  def cost(self):
+    return self._cost
+
+  @property
+  def final_state(self):
+    return self._final_state
+
+  @property
+  def lr(self):
+    return self._lr
+
+  @property
+  def train_op(self):
+    return self._train_op
 
 
-#――――――――――――――――预测模型――――――――――――――――――――
-def prediction(time_step=20):
-    X=tf.placeholder(tf.float32, shape=[None,time_step,input_size])
-    mean,std,test_x,test_y=get_test_data(time_step)
-    pred,_=lstm(X, "predict")
-    with tf.Session() as sess:
-        #参数恢复
-        sess.run(tf.global_variables_initializer())
-        new_saver = tf.train.import_meta_graph('model/toothless.model.meta')
-        new_saver.restore(sess, model_file_path)
-        test_predict=[]
-        for step in range(len(test_x)-1):
-          prob=sess.run(pred,feed_dict={X:[test_x[step]]})   
-          predict=prob.reshape((-1))
-          test_predict.extend(predict)
-        test_y=np.array(test_y)*std[input_size]+mean[input_size]
-        test_predict=np.array(test_predict)*std[input_size]+mean[input_size]
-        # acc=np.average(np.abs(test_predict-test_y[:len(test_predict)])/test_y[:len(test_predict)])  #偏差
-        # #以折线图表示结果
-        # plt.figure()
-        # plt.plot(list(range(len(test_predict))), test_predict, color='b')
-        # plt.plot(list(range(len(test_y))), test_y,  color='r')
-        # plt.show()
-        print(test_predict)
+class SmallConfig(object):
+  """Small config."""
+  init_scale = 0.1
+  learning_rate = 1.0
+  max_grad_norm = 5
+  num_layers = 2
+  num_steps = 20
+  hidden_size = 200
+  max_epoch = 4
+  max_max_epoch = 13
+  keep_prob = 1.0
+  lr_decay = 0.5
+  batch_size = 20
+  vocab_size = 3
 
 
-prediction() 
+class MediumConfig(object):
+  """Medium config."""
+  init_scale = 0.05
+  learning_rate = 1.0
+  max_grad_norm = 5
+  num_layers = 2
+  num_steps = 35
+  hidden_size = 650
+  max_epoch = 6
+  max_max_epoch = 39
+  keep_prob = 0.5
+  lr_decay = 0.8
+  batch_size = 20
+  vocab_size = 3
+
+
+class LargeConfig(object):
+  """Large config."""
+  init_scale = 0.04
+  learning_rate = 1.0
+  max_grad_norm = 10
+  num_layers = 2
+  num_steps = 35
+  hidden_size = 1500
+  max_epoch = 14
+  max_max_epoch = 55
+  keep_prob = 0.35
+  lr_decay = 1 / 1.15
+  batch_size = 20
+  vocab_size = 10000
+
+
+class TestConfig(object):
+  """Tiny config, for testing."""
+  init_scale = 0.1
+  learning_rate = 1.0
+  max_grad_norm = 1
+  num_layers = 1
+  num_steps = 2
+  hidden_size = 2
+  max_epoch = 1
+  max_max_epoch = 1
+  keep_prob = 1.0
+  lr_decay = 0.5
+  batch_size = 20
+  vocab_size = 3
+
+
+def run_epoch(session, model, eval_op=None, verbose=False):
+  """Runs the model on the given data."""
+  start_time = time.time()
+  costs = 0.0
+  iters = 0
+  state = session.run(model.initial_state)
+
+  fetches = {
+      "cost": model.cost,
+      "final_state": model.final_state,
+  }
+  if eval_op is not None:
+    fetches["eval_op"] = eval_op
+
+  for step in range(model.input.epoch_size):
+    feed_dict = {}
+    for i, (c, h) in enumerate(model.initial_state):
+      feed_dict[c] = state[i].c
+      feed_dict[h] = state[i].h
+
+    vals = session.run(fetches, feed_dict)
+    cost = vals["cost"]
+    state = vals["final_state"]
+
+    costs += cost
+    iters += model.input.num_steps
+
+    if verbose and step % (model.input.epoch_size // 10) == 10:
+      print("%.3f perplexity: %.3f speed: %.0f wps" %
+            (step * 1.0 / model.input.epoch_size, np.exp(costs / iters),
+             iters * model.input.batch_size / (time.time() - start_time)))
+
+  return np.exp(costs / iters)
+
+
+def get_config():
+  if FLAGS.model == "small":
+    return SmallConfig()
+  elif FLAGS.model == "medium":
+    return MediumConfig()
+  elif FLAGS.model == "large":
+    return LargeConfig()
+  elif FLAGS.model == "test":
+    return TestConfig()
+  else:
+    raise ValueError("Invalid model: %s", FLAGS.model)
+
+
+def main(_):
+  f=open('./data/labeled_daily_price.csv')
+  df=pd.read_csv(f)     #读入股票数据
+  raw_data=df.iloc[:,1:9].values  #取data（包括label)
+  train_data = raw_data[:int(len(raw_data) * 0.6)]
+  valid_data = raw_data[int(len(raw_data) * 0.6): int(len(raw_data) * 0.8)]
+  test_data = raw_data[int(len(raw_data) * 0.8):]
+
+  config = get_config()
+  eval_config = get_config()
+  eval_config.batch_size = 1
+  eval_config.num_steps = 1
+
+  with tf.Graph().as_default():
+    initializer = tf.random_uniform_initializer(-config.init_scale,
+                                                config.init_scale)
+
+    with tf.name_scope("Train"):
+      train_input = PTBInput(config=config, data=train_data, name="TrainInput") # 将原始的数据转化成需要的数据格式，转化的工作在reader.ptb_producer()中进行，主要input有，data, batch_size, step_num
+      with tf.variable_scope("Model", reuse=None, initializer=initializer):
+        m = PTBModel(is_training=True, config=config, input_=train_input)
+      tf.summary.scalar("Training Loss", m.cost)
+      tf.summary.scalar("Learning Rate", m.lr)
+
+    with tf.name_scope("Valid"):
+      valid_input = PTBInput(config=config, data=valid_data, name="ValidInput")
+      with tf.variable_scope("Model", reuse=True, initializer=initializer):
+        mvalid = PTBModel(is_training=False, config=config, input_=valid_input)
+      tf.summary.scalar("Validation Loss", mvalid.cost)
+
+    with tf.name_scope("Test"):
+      test_input = PTBInput(config=eval_config, data=test_data, name="TestInput")
+      with tf.variable_scope("Model", reuse=True, initializer=initializer):
+        mtest = PTBModel(is_training=False, config=eval_config,
+                         input_=test_input)
+
+    # sv = tf.train.Supervisor(logdir=FLAGS.save_path)
+    sv = tf.train.Supervisor(logdir="./model")
+    with sv.managed_session() as session:
+      for i in range(config.max_max_epoch):
+        lr_decay = config.lr_decay ** max(i + 1 - config.max_epoch, 0.0)
+        m.assign_lr(session, config.learning_rate * lr_decay)
+
+        print("Epoch: %d Learning rate: %.3f" % (i + 1, session.run(m.lr)))
+        train_perplexity = run_epoch(session, m, eval_op=m.train_op,
+                                     verbose=True)
+        print("Epoch: %d Train Perplexity: %.3f" % (i + 1, train_perplexity))
+        valid_perplexity = run_epoch(session, mvalid)
+        print("Epoch: %d Valid Perplexity: %.3f" % (i + 1, valid_perplexity))
+
+      test_perplexity = run_epoch(session, mtest)
+      print("Test Perplexity: %.3f" % test_perplexity)
+
+      # if FLAGS.save_path:
+      print("Saving model to %s." % './model')
+      sv.saver.save(session, "./model", global_step=sv.global_step)
+
+
+if __name__ == "__main__":
+  tf.app.run()
