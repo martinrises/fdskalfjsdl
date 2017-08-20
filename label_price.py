@@ -8,16 +8,18 @@ meta_trend_days = 15
 rate_threshold = 0.20
 
 class DailyRecord:
-    def __init__(self, open, close, high, low, turnover, volume):
+    def __init__(self, date, open, close, high, low, turnover, volume, balance):
+        self.date = str(date)
         self.open = float(open)
         self.close = float(close)
         self.high = float(high)
         self.low = float(low)
         self.turnover = float(turnover)
         self.volume = float(volume)
+        self.balance = balance_str(balance)
 
 
-target_file = open("labeled_daily_price.csv", 'w')
+target_file = open("./data/labeled_daily_price.csv", 'w')
 
 
 def get_finance_balance(path):
@@ -30,7 +32,12 @@ def get_finance_balance(path):
         result[datas[0]] = (datas[len(datas) - 1]).strip()
     return result
 
-with open("daily_price.csv", "r") as src_file:
+
+def balance_str(balance):
+    return str(balance) if balance != None else "0"
+
+
+with open("./data/daily_price.csv", "r") as src_file:
     lines = src_file.readlines()	
 
     # ,open,close,high,low,total_turnover,volume
@@ -45,14 +52,15 @@ with open("daily_price.csv", "r") as src_file:
     turnover_ix = keys.index("total_turnover")
     volume_ix = keys.index("volume")
 
-    finance_balance = get_finance_balance("/data/balance_origin.txt")
+    finance_balance = get_finance_balance("./data/balance_origin.txt")
 
     # 将csv中的数据反序列化为对象
     lines.remove(lines[0])
     records = []
     for line in lines:
         words = line.strip().split(",")
-        records.append(DailyRecord(words[open_ix], words[close_ix], words[high_ix], words[low_ix], words[turnover_ix], words[volume_ix]))
+        date = words[date_ix]
+        records.append(DailyRecord(date, words[open_ix], words[close_ix], words[high_ix], words[low_ix], words[turnover_ix], words[volume_ix], finance_balance.get(date)))
 
 
     # for i in range(meta_trend_days + 1, len(records)):
@@ -66,10 +74,10 @@ with open("daily_price.csv", "r") as src_file:
     	threshold_price = (highest - lowest) * rate_threshold
     	line = lines[i].strip()
     	if diff_price >= threshold_price:
-    		target_file.write(line + "," + str(trend_up) +"\n")
+    		target_file.write(line + "," + records[i].balance + "," + str(trend_up) +"\n")
     	elif diff_price <= -threshold_price:
-    		target_file.write(line + "," + str(trend_down) +"\n")
+    		target_file.write(line + "," + records[i].balance + ","+ str(trend_down) +"\n")
     	else:
-    		target_file.write(line + "," + str(trend_shake) +"\n")
+    		target_file.write(line + "," + records[i].balance + ","+ str(trend_shake) +"\n")
 
 target_file.close()
