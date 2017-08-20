@@ -18,6 +18,18 @@ class DailyRecord:
 
 
 target_file = open("labeled_daily_price.csv", 'w')
+
+
+def get_finance_balance(path):
+    with open(path, "r") as f:
+        lines = f.readlines()
+    result = {}
+    for i in range(len(lines) - 1):
+        line = lines[i]
+        datas = line.split(',')
+        result[datas[0]] = (datas[len(datas) - 1]).strip()
+    return result
+
 with open("daily_price.csv", "r") as src_file:
     lines = src_file.readlines()	
 
@@ -32,6 +44,8 @@ with open("daily_price.csv", "r") as src_file:
     low_ix = keys.index("low")
     turnover_ix = keys.index("total_turnover")
     volume_ix = keys.index("volume")
+
+    finance_balance = get_finance_balance("/data/balance_origin.txt")
 
     # 将csv中的数据反序列化为对象
     lines.remove(lines[0])
