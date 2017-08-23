@@ -1,9 +1,9 @@
 import math
 
 
-trend_down = 0
-trend_shake = 1
-trend_up = 2
+trend_down = '0,0,1'
+trend_shake = '0,1,0'
+trend_up = '1,0,0'
 meta_trend_days = 15
 rate_threshold = 0.20
 
