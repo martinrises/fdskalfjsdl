@@ -50,7 +50,7 @@ $ tar xvf simple-examples.tgz
 To run:
 
 $ python ptb_word_lm.py --data_path=simple-examples/data/
-python ptb_word_lm.py --data_path=simple-examples/data/
+
 """
 from __future__ import absolute_import
 from __future__ import division
@@ -62,9 +62,7 @@ import time
 import numpy as np
 import tensorflow as tf
 
-import pandas as pd
 import reader
-
 
 flags = tf.flags
 logging = tf.logging
@@ -93,17 +91,15 @@ class PTBInput(object):
     self.batch_size = batch_size = config.batch_size
     self.num_steps = num_steps = config.num_steps
     self.epoch_size = ((len(data) // batch_size) - 1) // num_steps
-    data_x = data[:reader.feature_size]
-    data_y = data[-1]
     self.input_data, self.targets = reader.ptb_producer(
-      data_x, data_y, batch_size, num_steps, name=name)
+        data, batch_size, num_steps, name=name)
 
 
 class PTBModel(object):
   """The PTB model."""
 
   def __init__(self, is_training, config, input_):
-    self._input = input_  # shape:[batch_size, num_steps, ...]
+    self._input = input_
 
     batch_size = input_.batch_size
     num_steps = input_.num_steps
@@ -126,16 +122,20 @@ class PTBModel(object):
       else:
         return tf.contrib.rnn.BasicLSTMCell(
             size, forget_bias=0.0, state_is_tuple=True)
-    attn_cell = lstm_cell # closure，f返回一个BaseLSTMCell
-    if is_training and config.keep_prob < 1: # keep_prob：在dropout的时候是否保持weights；如果小于1，就用Dropout包括一层。
+    attn_cell = lstm_cell
+    if is_training and config.keep_prob < 1:
       def attn_cell():
         return tf.contrib.rnn.DropoutWrapper(
             lstm_cell(), output_keep_prob=config.keep_prob)
     cell = tf.contrib.rnn.MultiRNNCell(
-        [attn_cell() for _ in range(config.num_layers)], state_is_tuple=True)  # 添加hidden layers
+        [attn_cell() for _ in range(config.num_layers)], state_is_tuple=True)
 
     self._initial_state = cell.zero_state(batch_size, data_type())
-    inputs = input_.input_data # 获取输入参数
+
+    with tf.device("/cpu:0"):
+      embedding = tf.get_variable(
+          "embedding", [vocab_size, size], dtype=data_type())
+      inputs = tf.nn.embedding_lookup(embedding, input_.input_data)
 
     if is_training and config.keep_prob < 1:
       inputs = tf.nn.dropout(inputs, config.keep_prob)
@@ -153,7 +153,7 @@ class PTBModel(object):
     state = self._initial_state
     with tf.variable_scope("RNN"):
       for time_step in range(num_steps):
-        if time_step > 0: tf.get_variable_scope().reuse_variables() # 接着之前训练过的Variable继续训练
+        if time_step > 0: tf.get_variable_scope().reuse_variables()
         (cell_output, state) = cell(inputs[:, time_step, :], state)
         outputs.append(cell_output)
 
@@ -163,12 +163,8 @@ class PTBModel(object):
     softmax_b = tf.get_variable("softmax_b", [vocab_size], dtype=data_type())
     logits = tf.matmul(output, softmax_w) + softmax_b
 
-
     # Reshape logits to be 3-D tensor for sequence loss
     logits = tf.reshape(logits, [batch_size, num_steps, vocab_size])
-
-    print("logits.shape = {}".format(logits.shape))
-    print("input_.targets.shape = {}".format(input_.targets.shape))
 
     # use the contrib sequence loss and average over the batches
     loss = tf.contrib.seq2seq.sequence_loss(
@@ -240,7 +236,7 @@ class SmallConfig(object):
   keep_prob = 1.0
   lr_decay = 0.5
   batch_size = 20
-  vocab_size = 3
+  vocab_size = 10000
 
 
 class MediumConfig(object):
@@ -256,7 +252,7 @@ class MediumConfig(object):
   keep_prob = 0.5
   lr_decay = 0.8
   batch_size = 20
-  vocab_size = 3
+  vocab_size = 10000
 
 
 class LargeConfig(object):
@@ -288,7 +284,7 @@ class TestConfig(object):
   keep_prob = 1.0
   lr_decay = 0.5
   batch_size = 20
-  vocab_size = 3
+  vocab_size = 10000
 
 
 def run_epoch(session, model, eval_op=None, verbose=False):
@@ -340,12 +336,11 @@ def get_config():
 
 
 def main(_):
-  f=open('./data/labeled_daily_price.csv')
-  df=pd.read_csv(f)     #读入股票数据
-  raw_data=df.iloc[:,1:9].values  #取data（包括label)
-  train_data = raw_data[:int(len(raw_data) * 0.6)]
-  valid_data = raw_data[int(len(raw_data) * 0.6): int(len(raw_data) * 0.8)]
-  test_data = raw_data[int(len(raw_data) * 0.8):]
+  if not FLAGS.data_path:
+    raise ValueError("Must set --data_path to PTB data directory")
+
+  raw_data = reader.ptb_raw_data(FLAGS.data_path)
+  train_data, valid_data, test_data, _ = raw_data
 
   config = get_config()
   eval_config = get_config()
@@ -357,7 +352,7 @@ def main(_):
                                                 config.init_scale)
 
     with tf.name_scope("Train"):
-      train_input = PTBInput(config=config, data=train_data, name="TrainInput") # 将原始的数据转化成需要的数据格式，转化的工作在reader.ptb_producer()中进行，主要input有，data, batch_size, step_num
+      train_input = PTBInput(config=config, data=train_data, name="TrainInput")
       with tf.variable_scope("Model", reuse=None, initializer=initializer):
         m = PTBModel(is_training=True, config=config, input_=train_input)
       tf.summary.scalar("Training Loss", m.cost)
@@ -375,8 +370,7 @@ def main(_):
         mtest = PTBModel(is_training=False, config=eval_config,
                          input_=test_input)
 
-    # sv = tf.train.Supervisor(logdir=FLAGS.save_path)
-    sv = tf.train.Supervisor(logdir="./model")
+    sv = tf.train.Supervisor(logdir=FLAGS.save_path)
     with sv.managed_session() as session:
       for i in range(config.max_max_epoch):
         lr_decay = config.lr_decay ** max(i + 1 - config.max_epoch, 0.0)
@@ -392,9 +386,9 @@ def main(_):
       test_perplexity = run_epoch(session, mtest)
       print("Test Perplexity: %.3f" % test_perplexity)
 
-      # if FLAGS.save_path:
-      print("Saving model to %s." % './model')
-      sv.saver.save(session, "./model", global_step=sv.global_step)
+      if FLAGS.save_path:
+        print("Saving model to %s." % FLAGS.save_path)
+        sv.saver.save(session, FLAGS.save_path, global_step=sv.global_step)
 
 
 if __name__ == "__main__":
