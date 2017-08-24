@@ -8,10 +8,11 @@ tf.set_random_seed(1)   # set random seed
 # hyperparameters
 lr = 0.001                  # learning rate
 training_iters = 1000     # train step 上限
-batch_size = 128
+batch_size = 60
 n_inputs = 7               # MNIST data input (img shape: 28*28)
 n_steps = 1                # time steps
-n_hidden_units = 28        # neurons in hidden layer
+n_hidden_units = 24        # neurons in hidden layer
+n_hidder_layers = 10       # 隐藏层的参数
 n_classes = 3              # MNIST classes (0-9 digits)
 
 # 导入数据
@@ -49,10 +50,14 @@ def RNN(X, weights, biases):
     # X_in ==> (128 batches, 28 steps, 128 hidden) 换回3维
     X_in = tf.reshape(X_in, [-1, n_steps, n_hidden_units])
     # 使用 basic LSTM Cell.
-    lstm_cell = tf.contrib.rnn.BasicLSTMCell(n_hidden_units, forget_bias=1.0, state_is_tuple=True)
-    init_state = lstm_cell.zero_state(batch_size, dtype=tf.float32)  # 初始化全零 state
-    outputs, final_state = tf.nn.dynamic_rnn(lstm_cell, X_in, initial_state=init_state, time_major=False)
-    results = tf.matmul(final_state[1], weights['out']) + biases['out']
+    def lstm_cell():
+        return tf.contrib.rnn.BasicLSTMCell(n_hidden_units, forget_bias=1.0, state_is_tuple=True)
+    stacked_lstm = tf.contrib.rnn.MultiRNNCell([lstm_cell() for _ in range(n_hidder_layers)])
+
+    init_state = stacked_lstm.zero_state(batch_size, dtype=tf.float32)  # 初始化全零 state
+    outputs, final_state = tf.nn.dynamic_rnn(stacked_lstm, X_in, initial_state=init_state, time_major=False)
+    outputs = tf.unstack(tf.transpose(outputs, [1, 0, 2]))
+    results = tf.matmul(outputs[-1], weights['out']) + biases['out']  # 选取最后一个 output
     return results
 
 pred = RNN(x, weights, biases)
