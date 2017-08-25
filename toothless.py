@@ -6,13 +6,12 @@ from tensorflow.examples.tutorials.mnist import input_data
 tf.set_random_seed(1)   # set random seed
 
 # hyperparameters
-lr = 0.001                  # learning rate
-training_iters = 1000     # train step 上限
+lr = 0.001                 # learning rate
+training_iters = 1000      # train step 上限
 batch_size = 60
-n_inputs = 7               # MNIST data input (img shape: 28*28)
-n_steps = 1                # time steps
-n_hidden_units = 24        # neurons in hidden layer
-n_hidder_layers = 10       # 隐藏层的参数
+n_inputs = 20              # MNIST data input (img shape: 28*28)
+n_hidden_units = 20        # neurons in hidden layer
+n_hidder_layers = 3       # 隐藏层的参数
 n_classes = 3              # MNIST classes (0-9 digits)
 
 # 导入数据
@@ -22,92 +21,50 @@ data=df.iloc[:,1:].values  #取第3-10列
 data_x = data[:, :n_inputs]
 data_y = data[:, n_inputs:]
 
-# x y placeholder
-x = tf.placeholder(tf.float32, [None, n_steps, n_inputs])
-y = tf.placeholder(tf.float32, [None, n_classes])
+input = tf.placeholder(dtype=tf.float32, shape=[n_inputs, None])
+target = tf.placeholder(dtype=tf.int32, shape=[n_classes, None])
 
-# 对 weights biases 初始值的定义
-weights = {
-    # shape (28, 128)
-    'in': tf.Variable(tf.random_normal([n_inputs, n_hidden_units])),
-    # shape (128, 10)
-    'out': tf.Variable(tf.random_normal([n_hidden_units, n_classes]))
-}
-biases = {
-    # shape (128, )
-    'in': tf.Variable(tf.constant(0.1, shape=[n_hidden_units, ])),
-    # shape (10, )
-    'out': tf.Variable(tf.constant(0.1, shape=[n_classes, ]))
-}
+input_W = tf.Variable(tf.zeros(shape=[n_hidden_units, n_inputs]))
+input_b = tf.Variable(tf.zeros(shape=[n_hidden_units, 1]))
+output0 = tf.add(tf.matmul(input_W, input), input_b)
 
-def RNN(X, weights, biases):
-    # 原始的 X 是 3 维数据, 我们需要把它变成 2 维数据才能使用 weights 的矩阵乘法
-    # X ==> (128 batches * 28 steps, 28 inputs)
-    X = tf.reshape(X, [-1, n_inputs])
 
-    # X_in = W*X + b
-    X_in = tf.matmul(X, weights['in']) + biases['in'] # shape=[-1, n_hidden_units]
-    # X_in ==> (128 batches, 28 steps, 128 hidden) 换回3维
-    X_in = tf.reshape(X_in, [-1, n_steps, n_hidden_units])
-    # 使用 basic LSTM Cell.
-    def lstm_cell():
-        return tf.contrib.rnn.BasicLSTMCell(n_hidden_units, forget_bias=1.0, state_is_tuple=True)
-    stacked_lstm = tf.contrib.rnn.MultiRNNCell([lstm_cell() for _ in range(n_hidder_layers)])
+def add_hidder_layer(input):
+    W = tf.Variable(tf.zeros(shape=[n_hidden_units, n_hidden_units]))
+    b = tf.Variable(tf.zeros(shape=[n_hidden_units, 1]))
+    output = tf.add(tf.matmul(W, input), b)
+    return output
 
-    init_state = stacked_lstm.zero_state(batch_size, dtype=tf.float32)  # 初始化全零 state
-    outputs, final_state = tf.nn.dynamic_rnn(stacked_lstm, X_in, initial_state=init_state, time_major=False)
-    outputs = tf.unstack(tf.transpose(outputs, [1, 0, 2]))
-    results = tf.matmul(outputs[-1], weights['out']) + biases['out']  # 选取最后一个 output
-    return results
 
-pred = RNN(x, weights, biases)
-cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=pred, labels=y))
-train_op = tf.train.AdamOptimizer(lr).minimize(cost)
+def stack_hidden_layer(input):
+    output_temp = input
+    for _ in range(n_hidder_layers - 1):
+        output_temp = add_hidder_layer(output_temp)
+    return output_temp
 
-correct_pred = tf.equal(tf.argmax(pred, 1), tf.argmax(y, 1))
+
+hidden_output = stack_hidden_layer(output0)
+output_W = tf.Variable(tf.zeros(shape=[n_classes, n_hidden_units]))
+outut_b = tf.Variable(tf.zeros(shape=[n_classes, 1]))
+output = tf.add(tf.matmul(output_W, hidden_output), outut_b)
+
+cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=tf.transpose(target), logits=tf.transpose(output)))
+
+correct_pred = tf.equal(tf.argmax(output, 0), tf.argmax(target, 0))
 accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 
-# 替换成下面的写法:
-init = tf.global_variables_initializer()
-
-
-def get_x_batch(step, batch_size):
-    '''
-    return data with shape = [None, n_steps, n_inputs]
-    '''
-    batch_xs = data_x[step * batch_size : (step + 1) * batch_size]
-    result = []
-    for item in batch_xs:
-        temp = [None]
-        temp[0] = item
-        result.append(temp)
-    return result
-
-
-def get_y_batch(step, batch_size):
-    '''
-    return data with shape = [None, n_classes]
-    '''
-    batch_ys = data_y[step * batch_size : (step + 1) * batch_size]
-    return batch_ys
-
+train_step = tf.train.GradientDescentOptimizer(lr).minimize(cross_entropy)
 
 with tf.Session() as sess:
-    sess.run(init)
+    init_op = tf.global_variables_initializer()
+    sess.run(init_op)
 
-    for i in range(training_iters):
-        step = 0
-        cost_float = 0.
-        accuracy_float = 0.
-        while (step + 1) * batch_size <= len(data):
-            batch_xs = get_x_batch(step, batch_size)
-            batch_ys = get_y_batch(step, batch_size)
-            sess.run([train_op], feed_dict={
-                x: batch_xs,
-                y: batch_ys,
-            })
+    optimizer = tf.train.GradientDescentOptimizer(lr)
+    for epoch in range(training_iters):
+        for i in range((len(data_x) // batch_size) - 1):
+            actual_x = np.transpose(data_x[i * batch_size: (i + 1) * batch_size, :])
+            actual_y = np.transpose(data_y[i * batch_size: (i + 1) * batch_size, :])
+            sess.run(train_step, feed_dict={input:actual_x, target: actual_y})
 
-            cost_float += sess.run(cost, feed_dict={x: batch_xs, y: batch_ys})
-            accuracy_float += sess.run(accuracy, feed_dict={x: batch_xs, y: batch_ys})
-            step += 1
-        print('step #{}, cost = {}, accuracy = {}'.format(i, cost_float/step, accuracy_float/step))
+        output_actual = sess.run(output, feed_dict={input: actual_x, target: actual_y})
+        print("epoch #{}, cost = {}, accuracy = {}, output = ".format(epoch, sess.run(cross_entropy, feed_dict={input:actual_x, target: actual_y}), sess.run(accuracy, feed_dict={input:actual_x, target: actual_y}), output_actual))
