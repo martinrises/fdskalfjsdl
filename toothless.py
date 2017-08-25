@@ -6,17 +6,17 @@ from tensorflow.examples.tutorials.mnist import input_data
 tf.set_random_seed(1)   # set random seed
 
 # hyperparameters
-lr = 0.0001                 # learning rate
+lr = 0.001                 # learning rate
 training_iters = 10000      # train step 上限
 batch_size = 100
-n_inputs = 20              # MNIST data input (img shape: 28*28)
+n_inputs = 14              # MNIST data input (img shape: 28*28)
 n_hidden_units = 20        # neurons in hidden layer
-n_hidder_layers = 4       # 隐藏层的参数
+n_hidder_layers = 2        # 隐藏层的参数
 n_classes = 3              # MNIST classes (0-9 digits)
 
 # 导入数据
 f=open('./data/labeled_daily_price.csv')
-df=pd.read_csv(f)     #读入股票数据
+df=pd.read_csv(f)
 data=df.iloc[:,1:].values  #取第3-10列
 data_x = data[:, :n_inputs]
 data_y = data[:, n_inputs:]
@@ -56,7 +56,7 @@ def stack_hidden_layer(input):
     return output_temp
 
 
-# hidden_output = stack_hidden_layer(output0)
+hidden_output = stack_hidden_layer(output0)
 output_W = tf.Variable(tf.zeros(shape=[n_hidden_units, n_classes]))
 outut_b = tf.Variable(tf.zeros(shape=[n_classes]))
 output = tf.matmul(output0, output_W) + outut_b
@@ -66,7 +66,7 @@ cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=ta
 correct_prediction = tf.equal(tf.argmax(output,1), tf.argmax(target,1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
-train_step = tf.train.GradientDescentOptimizer(lr).minimize(cross_entropy)
+train_step = tf.train.AdamOptimizer(lr).minimize(cross_entropy)
 
 with tf.Session() as sess:
     init_op = tf.global_variables_initializer()
