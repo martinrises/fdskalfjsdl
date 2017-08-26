@@ -1,70 +1,62 @@
-import tensorflow as tf
-import pandas as pd
-import numpy as np
+from market_state_checker import MarketStateChecker
 
-from tensorflow.examples.tutorials.mnist import input_data
-tf.set_random_seed(1)   # set random seed
-
-# hyperparameters
-lr = 0.001                 # learning rate
-training_iters = 1000      # train step 上限
-batch_size = 60
-n_inputs = 20              # MNIST data input (img shape: 28*28)
-n_hidden_units = 20        # neurons in hidden layer
-n_hidder_layers = 3       # 隐藏层的参数
-n_classes = 3              # MNIST classes (0-9 digits)
-
-# 导入数据
-f=open('./data/labeled_daily_price.csv')
-df=pd.read_csv(f)     #读入股票数据
-data=df.iloc[:,1:].values  #取第3-10列
-data_x = data[:, :n_inputs]
-data_y = data[:, n_inputs:]
-
-input = tf.placeholder(dtype=tf.float32, shape=[n_inputs, None])
-target = tf.placeholder(dtype=tf.int32, shape=[n_classes, None])
-
-input_W = tf.Variable(tf.zeros(shape=[n_hidden_units, n_inputs]))
-input_b = tf.Variable(tf.zeros(shape=[n_hidden_units, 1]))
-output0 = tf.add(tf.matmul(input_W, input), input_b)
+class DailyRecord:
+    def __init__(self, date, open, close, high, low, turnover, volume, balance):
+        self.date = str(date)
+        self.open = float(open)
+        self.close = float(close)
+        self.high = float(high)
+        self.low = float(low)
+        self.turnover = float(turnover)
+        self.volume = float(volume)
+        self.balance = balance
 
 
-def add_hidder_layer(input):
-    W = tf.Variable(tf.zeros(shape=[n_hidden_units, n_hidden_units]))
-    b = tf.Variable(tf.zeros(shape=[n_hidden_units, 1]))
-    output = tf.add(tf.matmul(W, input), b)
-    return output
+def get_finance_balance(path):
+    with open(path, "r") as f:
+        lines = f.readlines()
+        result = {}
+        for i in range(len(lines) - 1):
+            line = lines[i]
+            datas = line.split(',')
+            result[datas[0]] = float((datas[-1]).strip())
+        return result
 
 
-def stack_hidden_layer(input):
-    output_temp = input
-    for _ in range(n_hidder_layers - 1):
-        output_temp = add_hidder_layer(output_temp)
-    return output_temp
+def balance_str(balance):
+    return str(balance) if balance != None else "0"
 
 
-hidden_output = stack_hidden_layer(output0)
-output_W = tf.Variable(tf.zeros(shape=[n_classes, n_hidden_units]))
-outut_b = tf.Variable(tf.zeros(shape=[n_classes, 1]))
-output = tf.add(tf.matmul(output_W, hidden_output), outut_b)
 
-cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=tf.transpose(target), logits=tf.transpose(output)))
+with open("./data/daily_price.csv", "r") as src_file:
+    lines = src_file.readlines()
 
-correct_pred = tf.equal(tf.argmax(output, 0), tf.argmax(target, 0))
-accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+    # ,open,close,high,low,total_turnover,volume
+    keys = lines[0].strip().split(',')
 
-train_step = tf.train.GradientDescentOptimizer(lr).minimize(cross_entropy)
+    print(keys)
+    date_ix = keys.index("")
+    open_ix = keys.index("open")
+    close_ix = keys.index("close")
+    high_ix = keys.index("high")
+    low_ix = keys.index("low")
+    turnover_ix = keys.index("total_turnover")
+    volume_ix = keys.index("volume")
 
-with tf.Session() as sess:
-    init_op = tf.global_variables_initializer()
-    sess.run(init_op)
+    finance_balance = get_finance_balance("./data/balance_origin.txt")
 
-    optimizer = tf.train.GradientDescentOptimizer(lr)
-    for epoch in range(training_iters):
-        for i in range((len(data_x) // batch_size) - 1):
-            actual_x = np.transpose(data_x[i * batch_size: (i + 1) * batch_size, :])
-            actual_y = np.transpose(data_y[i * batch_size: (i + 1) * batch_size, :])
-            sess.run(train_step, feed_dict={input:actual_x, target: actual_y})
+    # 将csv中的数据反序列化为对象
+    lines.remove(lines[0])
+    records = []
+    for line in lines:
+        words = line.strip().split(",")
+        date = words[date_ix]
+        records.append(DailyRecord(date, words[open_ix], words[close_ix], words[high_ix], words[low_ix], words[turnover_ix], words[volume_ix], finance_balance.get(date)))
 
-        output_actual = sess.run(output, feed_dict={input: actual_x, target: actual_y})
-        print("epoch #{}, cost = {}, accuracy = {}, output = ".format(epoch, sess.run(cross_entropy, feed_dict={input:actual_x, target: actual_y}), sess.run(accuracy, feed_dict={input:actual_x, target: actual_y}), output_actual))
+    records = records[-len(finance_balance):]
+
+    checker = MarketStateChecker(records)
+    for days in range(len(records) - 1):
+        checker.on_day_triggered(days)
+
+    checker.finish(len(records) - 2)
