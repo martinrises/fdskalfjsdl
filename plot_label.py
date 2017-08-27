@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import pandas as pd
 
-f=open('labeled_daily_price.csv') 
+f=open('./data/labeled_daily_price.csv')
 df=pd.read_csv(f)     #读入股票数据
 y=df.iloc[:,7].values  #取第label
 

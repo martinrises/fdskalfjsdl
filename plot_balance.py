@@ -1,4 +1,7 @@
-from market_state_checker import MarketStateChecker
+import matplotlib.pyplot as plt
+import tensorflow as tf
+
+DAYS = 60
 
 class DailyRecord:
     def __init__(self, date, open, close, high, low, turnover, volume, balance):
@@ -21,11 +24,6 @@ def get_finance_balance(path):
             datas = line.split(',')
             result[datas[0]] = float((datas[-1]).strip())
         return result
-
-
-def balance_str(balance):
-    return str(balance) if balance != None else "0"
-
 
 
 with open("./data/daily_price.csv", "r") as src_file:
@@ -55,9 +53,26 @@ with open("./data/daily_price.csv", "r") as src_file:
 
     records = records[-len(finance_balance):]
 
-    checker = MarketStateChecker(records)
-    for days in range(len(records) - 1):
-        checker.on_day_triggered(days)
+data_price = list(zip(range(len(records)), [r.close for r in records]))
+data_price = data_price[-1:-DAYS:-1]
+data_price = tf.unstack(data_price, axis=1)
+with tf.Session() as sess:
+    data_price = sess.run(data_price)
+
+balance = []
+for r in records:
+    if not r.balance == None:
+        balance.append(r.balance/200000000 * 3/4)
+    else:
+        balance.append(0)
+
+data_balance = list(zip(range(len(records)), balance))
+data_balance = data_balance[-1:-DAYS:-1]
+data_balance = tf.unstack(data_balance, axis=1)
+with tf.Session() as sess:
+    data_balance = sess.run(data_balance)
 
 
-    checker.finish(len(records) - 2)
+plt.plot(data_price[0],data_price[1])
+plt.plot(data_balance[0],data_balance[1])
+plt.show()

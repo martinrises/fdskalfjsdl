@@ -5,7 +5,8 @@ state_shake = 1
 state_down = 0
 
 THRESHOLD_DAYS = 4
-THRESHOLD_BUFFER_DAYS = 4
+THRESHOLD_DIFF_BUFFER_DAYS = 1
+THRESHOLD_SAME_BUFFER_DAYS = 4
 
 class MarketStateChecker:
     def __init__(self, records, state=state_up, last_state=state_up):
@@ -15,6 +16,7 @@ class MarketStateChecker:
         self.high = [-1,0] # high[0] = 第几天， high[1] = 价格
         self.low = [-1,999999999] # low[0] = 第几天, low[1] = 价格
         self.quanter = Quanter()
+        self.last_year = '2014'
 
     def on_day_triggered(self, day_index):
         '''
@@ -29,10 +31,11 @@ class MarketStateChecker:
                 self.high = [day_index, record.balance]
             else:
                 if last_record.close < record.close:
-                    self.low = [day_index, record.balance]
-                    self.change_state(day_index, state_shake)
+                    if day_index - self.high[0] > THRESHOLD_DIFF_BUFFER_DAYS:
+                        self.low = [day_index, record.balance]
+                        self.change_state(day_index, state_shake)
                 else:
-                    if day_index - self.high[0] > THRESHOLD_BUFFER_DAYS:
+                    if day_index - self.high[0] > THRESHOLD_SAME_BUFFER_DAYS:
                         self.low = [day_index, record.balance]
                         self.change_state(day_index, state_shake)
         elif self.curr_state[1] == state_down:
@@ -40,10 +43,11 @@ class MarketStateChecker:
                 self.low = [day_index, record.balance]
             else:
                 if last_record.close > record.close:
-                    self.high = [day_index, record.balance]
-                    self.change_state(day_index, state_shake)
+                    if day_index - self.low[0] > THRESHOLD_DIFF_BUFFER_DAYS:
+                        self.high = [day_index, record.balance]
+                        self.change_state(day_index, state_shake)
                 else:
-                    if day_index - self.low[0] > THRESHOLD_BUFFER_DAYS:
+                    if day_index - self.low[0] > THRESHOLD_SAME_BUFFER_DAYS:
                         self.high = [day_index, record.balance]
                         self.change_state(day_index, state_shake)
         else:
@@ -76,6 +80,11 @@ class MarketStateChecker:
                     self.high = [day_index, record.balance]
                 elif record.balance < self.low[1]:
                     self.low = [day_index, record.balance]
+
+        curr_year = record.date.split("-")[0]
+        if curr_year != self.last_year:
+            self.quanter.on_year_change(self.last_year, curr_year, record)
+            self.last_year = curr_year
 
     def change_state(self, day_index, state):
         self.quanter.on_market_state_change(self.curr_state[1], state, self.records[day_index + 1])

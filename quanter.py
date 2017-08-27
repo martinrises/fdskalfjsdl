@@ -1,15 +1,17 @@
 import market_state_checker
+import math
 
-init_money = 1000000
+INIT_MONEY = 1000000
 
 class Quanter:
     def __init__(self):
-        self._money = init_money
+        self._money = INIT_MONEY
         self._stock = 0 # 借的股票
         self._borrow = 0 # 买的股票
         self._assets = self._money
         self._high = 0
         self._low = 9999999999
+        self.year_record = [("2014", INIT_MONEY)]
 
     def on_market_state_change(self, old_state, new_state, next_day_record):
         open_next_day = next_day_record.open
@@ -49,4 +51,28 @@ class Quanter:
 
     def finish(self, next_day_record):
         self.quit_market(next_day_record)
-        print("finish, assets = {},\t win = {},\t max_fallback = {}".format(self._assets,  str(100 * (self._assets - init_money)/ init_money) + "%", str(100 * (self._high - self._low)/self._high) + "%"))
+        self.on_year_change("2017", "2018",next_day_record)
+        for i in range(len(self.year_record)):
+            assets_record = self.year_record[i]
+            last_index = 0
+            if i > 0:
+                last_index = i - 1
+            start_assets = self.year_record[last_index][1]
+            end_assets = self.year_record[i][1]
+            print("{}, start_assets = {}, end_assets = {}, win_rate = {}".format(
+                assets_record[0],
+                start_assets,
+                end_assets,
+                str(100 * (end_assets - start_assets) / start_assets) + "%"
+            ))
+        print("finish, assets = {},\t win = {},\t max_fallback = {}".format(self._assets, str(100 * (self._assets - INIT_MONEY) / INIT_MONEY) + "%", str(100 * (self._high - self._low) / self._high) + "%"))
+
+    def on_year_change(self, last_year, curr_year, record):
+        assets = self._money
+        if self._stock > 0:
+            assets += self._stock * record.close
+
+        if self._borrow > 0:
+            assets -= self._borrow * record.close
+
+        self.year_record.append((last_year,assets))
