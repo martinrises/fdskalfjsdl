@@ -4,7 +4,8 @@ state_up = 2
 state_shake = 1
 state_down = 0
 
-threshold_days = 4
+THRESHOLD_DAYS = 4
+THRESHOLD_BUFFER_DAYS = 4
 
 class MarketStateChecker:
     def __init__(self, records, state=state_up, last_state=state_up):
@@ -21,23 +22,34 @@ class MarketStateChecker:
         :param day_index: 市场的第day_index天
         :return: None
         '''
+        last_record = self.records[day_index-1]
         record = self.records[day_index]
         if self.curr_state[1] == state_up:
             if record.balance > self.high[1]:
                 self.high = [day_index, record.balance]
             else:
-                self.low = [day_index, record.balance]
-                self.change_state(day_index, state_shake)
+                if last_record.close < record.close:
+                    self.low = [day_index, record.balance]
+                    self.change_state(day_index, state_shake)
+                else:
+                    if day_index - self.high[0] > THRESHOLD_BUFFER_DAYS:
+                        self.low = [day_index, record.balance]
+                        self.change_state(day_index, state_shake)
         elif self.curr_state[1] == state_down:
             if record.balance < self.low[1]:
                 self.low = [day_index, record.balance]
             else:
-                self.high = [day_index, record.balance]
-                self.change_state(day_index, state_shake)
+                if last_record.close > record.close:
+                    self.high = [day_index, record.balance]
+                    self.change_state(day_index, state_shake)
+                else:
+                    if day_index - self.low[0] > THRESHOLD_BUFFER_DAYS:
+                        self.high = [day_index, record.balance]
+                        self.change_state(day_index, state_shake)
         else:
             if self.last_state[1] == state_up:
                 if record.balance < self.low[1]:
-                    if day_index - self.curr_state[0] > threshold_days:
+                    if day_index - self.curr_state[0] > THRESHOLD_DAYS:
                         self.low = [day_index, record.balance]
                         self.change_state(day_index, state_down)
 
@@ -47,7 +59,7 @@ class MarketStateChecker:
 
             elif self.last_state[1] == state_down:
                 if record.balance > self.high[1]:
-                    if day_index - self.curr_state[0] > threshold_days:
+                    if day_index - self.curr_state[0] > THRESHOLD_DAYS:
                         self.high = [day_index, record.balance]
                         self.change_state(day_index, state_up)
 
@@ -55,9 +67,9 @@ class MarketStateChecker:
                     self.low = [day_index, record.balance]
                     self.change_state(day_index, state_down)
             else:
-                if record.balance < self.low[1] and day_index - self.curr_state[0] > threshold_days:
+                if record.balance < self.low[1] and day_index - self.curr_state[0] > THRESHOLD_DAYS:
                     self.change_state(day_index, state_down)
-                elif record.balance > self.high[1] and day_index - self.curr_state[0] > threshold_days:
+                elif record.balance > self.high[1] and day_index - self.curr_state[0] > THRESHOLD_DAYS:
                     self.change_state(day_index, state_up)
 
                 if record.balance > self.high[1]:
