@@ -1,4 +1,5 @@
 from market_state_checker import MarketStateChecker
+import market_state_checker
 
 class DailyRecord:
     def __init__(self, date, open, close, high, low, turnover, volume, balance):
@@ -56,8 +57,11 @@ with open("./data/daily_price.csv", "r") as src_file:
     records = records[-len(finance_balance):]
 
     checker = MarketStateChecker(records)
-    for days in range(len(records) - 1):
-        checker.on_day_triggered(days)
 
-
-    checker.finish(len(records) - 2)
+    for i in range(1,11):
+        for j in range(1, 11):
+            market_state_checker.THRESHOLD_SHAKE_SIGNAL = i
+            market_state_checker.THRESHOLD_TURNOVER_SIGHAL = j
+            for days in range(len(records) - 1):
+                checker.on_day_triggered(days)
+            checker.finish(len(records) - 2)
