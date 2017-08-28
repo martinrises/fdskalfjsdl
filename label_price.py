@@ -6,7 +6,7 @@ trend_shake = '0,1,0'
 trend_up = '1,0,0'
 meta_trend_days = 15
 rate_threshold = 0.20
-average_days = [2, 4, 8, 16, 32, 64, 128]
+average_days = [5, 10]
 
 class DailyRecord:
     def __init__(self, date, open, close, high, low, turnover, volume):
@@ -21,7 +21,7 @@ class DailyRecord:
         self.average_vol = None
 
     def __str__(self):
-        return '{},{},{},{},{},{},{},{},{}'.format(self.date, self.open, self.close, self.high, self.low, self.turnover, self.volume, list_to_csv_str(self.average_price), list_to_csv_str(self.average_vol))
+        return '{},{},{},{},{},{},{},{}'.format(self.date, self.open/self.close, self.close/self.close, self.high/self.close, self.low/self.close, self.volume/self.volume, list_to_csv_str([price /self.close for price in self.average_price]), list_to_csv_str([vol / self.volume for vol in self.average_vol]))
 
 
 target_file = open("./data/labeled_daily_price.csv", 'w')

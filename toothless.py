@@ -9,7 +9,7 @@ tf.set_random_seed(1)   # set random seed
 lr = 0.001                 # learning rate
 training_iters = 10000      # train step 上限
 batch_size = 100
-n_inputs = 14              # MNIST data input (img shape: 28*28)
+n_inputs = 9             # MNIST data input (img shape: 28*28)
 n_hidden_units = 20        # neurons in hidden layer
 n_hidder_layers = 2        # 隐藏层的参数
 n_classes = 3              # MNIST classes (0-9 digits)
@@ -66,7 +66,7 @@ cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=ta
 correct_prediction = tf.equal(tf.argmax(output,1), tf.argmax(target,1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
-train_step = tf.train.AdamOptimizer(lr).minimize(cross_entropy)
+train_step = tf.train.GradientDescentOptimizer(lr).minimize(cross_entropy)
 
 with tf.Session() as sess:
     init_op = tf.global_variables_initializer()
