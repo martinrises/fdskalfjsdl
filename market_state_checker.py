@@ -11,19 +11,15 @@ THRESHOLD_SAME_BUFFER_DAYS = 4
 class MarketStateChecker:
     def __init__(self, records, state=state_up, last_state=state_up):
         self.records = records
-        self.curr_state = [0, state] # curr_state[0] = 第几天变为curr_state， curr_state = [1] = state
-        self.last_state = [0, last_state]  # last_state[0] = 第几天变为last_state， last_state = [1] = state
-        self.high = [-1,0] # high[0] = 第几天， high[1] = 价格
-        self.low = [-1,999999999] # low[0] = 第几天, low[1] = 价格
+        self.curr_state = [0, state]
+        self.last_state = [0, last_state]
+        self.high = [-1,0]
+        self.low = [-1,999999999]
         self.quanter = Quanter()
         self.last_year = '2014'
 
     def on_day_triggered(self, day_index):
-        '''
-        根据现在的状态和新的价格，判断应该进入什么状态
-        :param day_index: 市场的第day_index天
-        :return: None
-        '''
+
         last_record = self.records[day_index-1]
         record = self.records[day_index]
         if self.curr_state[1] == state_up:
