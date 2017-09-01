@@ -11,7 +11,7 @@ RANDOM_MAX = 1.02
 RANDOM_MIM = 0.98
 DISTANCE_THRESHOLD = 0.05
 GOLD_WIN = 0.005
-GOLD_NUM = 25
+GOLD_NUM = 30
 MAX_EPOCH = 10
 NEED_TRAIN = True
 
@@ -114,8 +114,8 @@ with open("./data/daily_price.csv", "r") as src_file:
     cv_records = records[split_index_1: split_index_2]
     test_records = records[split_index_2:]
 
-    centers_file_name = "./data/k_means/centers_" + str(DAYS) + ".csv"
-    distances_file_name = "./data/k_means/distance_" + str(DAYS) + ".csv"
+    centers_file_name = "./data/k_means/centers_{}_{}_{}.csv".format(str(DAYS), str(GOLD_WIN * 1000), str(GOLD_NUM))
+    distances_file_name = "./data/k_means/distance_{}_{}_{}.csv".format(str(DAYS), str(GOLD_WIN * 1000), str(GOLD_NUM))
     if NEED_TRAIN:
         gold_centers = []
         gold_distances = []
