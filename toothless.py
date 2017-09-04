@@ -9,9 +9,10 @@ DAYS = 10
 CENTER_NUM = 100
 RANDOM_MAX = 1.02
 RANDOM_MIM = 0.98
-DISTANCE_THRESHOLD = 0.2
-GOLD_WIN = 0.005
-GOLD_NUM = 30
+DISTANCE_THRESHOLD = 0.8
+GOLD_WIN = 0.004
+GOLD_WIN_RATE = 0.6
+GOLD_NUM = 20
 MAX_EPOCH = 100
 NEED_TRAIN = True
 
@@ -216,7 +217,7 @@ with open("./data/daily_price.csv", "r") as src_file:
             result_dic = sort_dictionary(gains)
             print("centers.size = {}".format(len(centers)))
             print("centers = {}".format(centers))
-            print("center_cnt = {}".format(center_cnt))
+            print("center_cnt = {}".format(sort_dictionary(center_cnt)))
             print("center_real_cnt = {}".format({key: value.times for key, value in result_dic.items()}))
             print("win_rate = {}".format({key: value.win_rate for key, value in result_dic.items()}))
             print("gains = {}".format({key: value.gain for key, value in result_dic.items()}))
@@ -268,7 +269,13 @@ with open("./data/daily_price.csv", "r") as src_file:
 
                 gain_result = gains.get(i)
                 cv_gain_result = cv_gains.get(i)
-                if gain_result is not None and gain_result.gain > GOLD_WIN and cv_gain_result is not None and cv_gain_result.gain > GOLD_WIN and gain_result.times > GOLD_NUM and cv_gain_result.times > GOLD_NUM:
+                if gain_result is not None and cv_gain_result is not None\
+                        and gain_result.gain > GOLD_WIN \
+                        and cv_gain_result.gain > GOLD_WIN \
+                        and gain_result.times > GOLD_NUM \
+                        and cv_gain_result.times > GOLD_NUM\
+                        and gain_result.win_rate > GOLD_WIN_RATE\
+                        and cv_gain_result.win_rate > GOLD_WIN_RATE:
                     gold_centers.append(center)
                     gold_distances.append(average_distances.get(i))
                     gold_win_rates.append((gains.get(i).win_rate + cv_gains.get(i).win_rate) / 2)
