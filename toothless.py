@@ -9,7 +9,7 @@ DAYS = 10
 CENTER_NUM = 100
 RANDOM_MAX = 1.02
 RANDOM_MIM = 0.98
-DISTANCE_THRESHOLD = 0.05
+DISTANCE_THRESHOLD = 0.2
 GOLD_WIN = 0.005
 GOLD_NUM = 30
 MAX_EPOCH = 100
@@ -127,9 +127,11 @@ with open("./data/daily_price.csv", "r") as src_file:
 
     centers_file_name = "./data/k_means/centers_{}_{}_{}.csv".format(str(DAYS), str(GOLD_WIN * 1000), str(GOLD_NUM))
     distances_file_name = "./data/k_means/distance_{}_{}_{}.csv".format(str(DAYS), str(GOLD_WIN * 1000), str(GOLD_NUM))
+    win_rate_file_name = "./data/k_means/win_rate_{}_{}_{}.csv".format(str(DAYS), str(GOLD_WIN * 1000), str(GOLD_NUM))
     if NEED_TRAIN:
         gold_centers = []
         gold_distances = []
+        gold_win_rates = []
         for train_step in range(MAX_EPOCH):
             # train
             k_means_records = []
@@ -181,25 +183,25 @@ with open("./data/daily_price.csv", "r") as src_file:
             for k_means_record in k_means_records:
                 index = k_means_record.center_index
                 distance = get_distance_from_center(k_means_record.features, centers[index])
-                distribute_dis = distribute_distances.get(index) if distribute_distances.get(index) != None else 0
+                distribute_dis = distribute_distances.get(index) if distribute_distances.get(index) is not None else 0
                 distribute_distances[index] = distribute_dis + distance
 
-                cnt = center_cnt.get(index) if center_cnt.get(index) != None else 0
+                cnt = center_cnt.get(index) if center_cnt.get(index) is not None else 0
                 cnt += 1
                 center_cnt[index] = cnt
 
-            average_distance = {}
+            average_distances = {}
             distances_keys = distribute_distances.keys()
             for key in distances_keys:
-                average_distance[key] = distribute_distances.get(key) / center_cnt.get(key)
+                average_distances[key] = distribute_distances.get(key) / center_cnt.get(key)
 
             gains = {}
             for k_means_record in k_means_records:
                 index = k_means_record.center_index
                 distance = get_distance_from_center(k_means_record.features, centers[index])
 
-                if distance < distribute_distances.get(index) * DISTANCE_THRESHOLD:
-                    gain_result = gains.get(index) if gains.get(index) != None else GainResult()
+                if distance < average_distances.get(index) * DISTANCE_THRESHOLD:
+                    gain_result = gains.get(index) if gains.get(index) is not None else GainResult()
                     gain_result.times += 1
                     if k_means_record.gain > 0:
                         gain_result.win_times += 1
@@ -237,7 +239,7 @@ with open("./data/daily_price.csv", "r") as src_file:
                 cnt += 1
                 cv_center_cnt[index] = cnt
 
-                if distance < distribute_distances.get(index) * DISTANCE_THRESHOLD:
+                if distance < average_distances.get(index) * DISTANCE_THRESHOLD:
                     gain_result = cv_gains.get(index) if cv_gains.get(index) is not None else GainResult()
                     gain_result.times += 1
 
@@ -268,7 +270,8 @@ with open("./data/daily_price.csv", "r") as src_file:
                 cv_gain_result = cv_gains.get(i)
                 if gain_result is not None and gain_result.gain > GOLD_WIN and cv_gain_result is not None and cv_gain_result.gain > GOLD_WIN and gain_result.times > GOLD_NUM and cv_gain_result.times > GOLD_NUM:
                     gold_centers.append(center)
-                    gold_distances.append(distribute_distances.get(i))
+                    gold_distances.append(average_distances.get(i))
+                    gold_win_rates.append((gains.get(i).win_rate + cv_gains.get(i).win_rate) / 2)
 
             print("\n step # {}, gold_centers.size = {}\n\n".format(train_step, len(gold_centers)))
 
@@ -277,12 +280,16 @@ with open("./data/daily_price.csv", "r") as src_file:
 
         is_file_exist = os.path.isfile(centers_file_name)
         open_mode = "a" if is_file_exist else "w"
-        with open(centers_file_name, open_mode, newline='') as centers_f, open(distances_file_name, open_mode) as distances_f:
+        with open(centers_file_name, open_mode, newline='') as centers_f,\
+                open(distances_file_name, open_mode) as distances_f, \
+                open(win_rate_file_name, open_mode) as win_rate_f:
             center_f_csv_writer = csv.writer(centers_f)
             for center in gold_centers:
                 center_f_csv_writer.writerow(center)
             for distance in gold_distances:
                 distances_f.write(str(distance) + "\n")
+            for win_rate in gold_win_rates:
+                win_rate_f.write(str(win_rate) + "\n")
 
     # test
     # get gold_centers and gold_distances from file
