@@ -13,7 +13,7 @@ DISTANCE_THRESHOLD = 0.8
 GOLD_WIN = 0.004
 GOLD_WIN_RATE = 0.6
 GOLD_NUM = 20
-MAX_EPOCH = 100
+MAX_EPOCH = 30
 NEED_TRAIN = True
 
 class DailyRecord:
@@ -288,15 +288,25 @@ with open("./data/daily_price.csv", "r") as src_file:
         is_file_exist = os.path.isfile(centers_file_name)
         open_mode = "a" if is_file_exist else "w"
         with open(centers_file_name, open_mode, newline='') as centers_f,\
-                open(distances_file_name, open_mode) as distances_f, \
-                open(win_rate_file_name, open_mode) as win_rate_f:
+                open(distances_file_name, open_mode, newline='') as distances_f, \
+                open(win_rate_file_name, open_mode, newline='') as win_rate_f:
             center_f_csv_writer = csv.writer(centers_f)
-            for center in gold_centers:
-                center_f_csv_writer.writerow(center)
-            for distance in gold_distances:
-                distances_f.write(str(distance) + "\n")
-            for win_rate in gold_win_rates:
-                win_rate_f.write(str(win_rate) + "\n")
+            center_f_csv_reader = csv.reader(centers_f)
+            center_in_file = list(center_f_csv_reader)
+
+            distance_f_csv_writer = csv.writer(distances_f)
+
+            win_rate_f_csv_writer = csv.writer(win_rate_f)
+
+            for i in range(len(gold_centers)):
+                center = gold_centers[i]
+                distance = gold_distances[i]
+                win_rate = gold_win_rates[i]
+
+                if center not in center_in_file:
+                    center_f_csv_writer.writerow(center)
+                    distances_f.write(str(distance) + "\n")
+                    win_rate_f.write(str(win_rate) + "\n")
 
     # test
     # get gold_centers and gold_distances from file
