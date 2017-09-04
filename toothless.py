@@ -12,7 +12,7 @@ RANDOM_MIM = 0.98
 DISTANCE_THRESHOLD = 0.05
 GOLD_WIN = 0.005
 GOLD_NUM = 30
-MAX_EPOCH = 10
+MAX_EPOCH = 100
 NEED_TRAIN = True
 
 class DailyRecord:
@@ -25,6 +25,17 @@ class DailyRecord:
         self.turnover = float(turnover)
         self.volume = float(volume)
         self.balance = balance
+
+class GainResult:
+    def __init__(self):
+        self.gain = 0
+        self.win_rate = 0
+        self.times = 0
+        self.win_times = 0
+
+    def calculate_gain(self):
+        self.gain = self.gain / self.times
+        self.win_rate = self.win_times / self.times
 
 class KMeansRecord:
     def __init__(self, records, index, days):
@@ -182,37 +193,37 @@ with open("./data/daily_price.csv", "r") as src_file:
             for key in distances_keys:
                 average_distance[key] = distribute_distances.get(key) / center_cnt.get(key)
 
-            center_real_cnt = {}
             gains = {}
             for k_means_record in k_means_records:
                 index = k_means_record.center_index
                 distance = get_distance_from_center(k_means_record.features, centers[index])
 
                 if distance < distribute_distances.get(index) * DISTANCE_THRESHOLD:
-                    cnt = center_real_cnt.get(index) if center_real_cnt.get(index) != None else 0
-                    cnt += 1
-                    center_real_cnt[index] = cnt
+                    gain_result = gains.get(index) if gains.get(index) != None else GainResult()
+                    gain_result.times += 1
+                    if k_means_record.gain > 0:
+                        gain_result.win_times += 1
 
-                    gain = gains.get(index) if gains.get(index) != None else 0
-                    gains[index] = gain + k_means_record.gain
+                    gain_result.gain += k_means_record.gain
+                    gains[index] = gain_result
 
             for key in gains.keys():
-                gain = gains.get(key)
-                real_cnt = center_real_cnt.get(key)
-                gains[key] = gain/real_cnt
+                gain_record = gains.get(key)
+                gain_record.calculate_gain()
 
+            result_dic = sort_dictionary(gains)
             print("centers.size = {}".format(len(centers)))
             print("centers = {}".format(centers))
-            print("center_cnt = {}".format(sort_dictionary(center_cnt)))
-            print("cneter_real_cnt = {}".format(sort_dictionary(center_real_cnt)))
-            print("gains = {}".format(sort_dictionary(gains)))
+            print("center_cnt = {}".format(center_cnt))
+            print("center_real_cnt = {}".format({key: value.times for key, value in result_dic.items()}))
+            print("win_rate = {}".format({key: value.win_rate for key, value in result_dic.items()}))
+            print("gains = {}".format({key: value.gain for key, value in result_dic.items()}))
 
             # cross validation
             k_means_cv_records = []
             for i in range(DAYS, len(cv_records) - DAYS):
                 k_means_cv_records.append(KMeansRecord(cv_records, index=i, days=DAYS))
 
-            cv_center_real_cnt = {}
             cv_gains = {}
             cv_center_cnt = {}
             for k_means_record in k_means_cv_records:
@@ -222,27 +233,30 @@ with open("./data/daily_price.csv", "r") as src_file:
                 index = k_means_record.center_index
                 distance = distances[index]
 
-                cnt = cv_center_cnt.get(index) if cv_center_cnt.get(index) != None else 0
+                cnt = cv_center_cnt.get(index) if cv_center_cnt.get(index) is not None else 0
                 cnt += 1
                 cv_center_cnt[index] = cnt
 
                 if distance < distribute_distances.get(index) * DISTANCE_THRESHOLD:
-                    cnt = cv_center_real_cnt.get(index) if cv_center_real_cnt.get(index) != None else 0
-                    cnt += 1
-                    cv_center_real_cnt[index] = cnt
+                    gain_result = cv_gains.get(index) if cv_gains.get(index) is not None else GainResult()
+                    gain_result.times += 1
 
-                    gain = cv_gains.get(index) if cv_gains.get(index) != None else 0
-                    cv_gains[index] = gain + k_means_record.gain
+                    if k_means_record.gain > 0:
+                        gain_result.win_times += 1
+
+                    gain_result.gain += k_means_record.gain
+                    cv_gains[index] = gain_result
 
             for key in cv_gains.keys():
                 gain = cv_gains.get(key)
-                real_cnt = cv_center_real_cnt.get(key)
-                cv_gains[key] = gain / real_cnt
+                gain.calculate_gain()
 
-            print("\ncenters = {}".format(centers))
+            result_dic = sort_dictionary(cv_gains)
+            print("\ncross validation\ncenters = {}".format(centers))
             print("center_cnt = {}".format(sort_dictionary(cv_center_cnt)))
-            print("cneter_real_cnt = {}".format(sort_dictionary(cv_center_real_cnt)))
-            print("gains = {}".format(sort_dictionary(cv_gains)))
+            print("center_real_cnt = {}".format({key: value.times for key, value in result_dic.items()}))
+            print("center_win_rate = {}".format({key: value.win_rate for key, value in result_dic.items()}))
+            print("gains = {}".format({key: value.gain for key, value in result_dic.items()}))
 
             # gold centers
             for i in range(len(centers)):
@@ -250,7 +264,9 @@ with open("./data/daily_price.csv", "r") as src_file:
                 if center in gold_centers:
                     continue
 
-                if gains.get(i) != None and gains.get(i) > GOLD_WIN and cv_gains.get(i) != None and cv_gains.get(i) > GOLD_WIN and center_real_cnt.get(i) and center_real_cnt.get(i) != None and center_real_cnt.get(i) > GOLD_NUM and cv_center_real_cnt.get(i) != None and cv_center_real_cnt.get(i) > GOLD_NUM:
+                gain_result = gains.get(i)
+                cv_gain_result = cv_gains.get(i)
+                if gain_result is not None and gain_result.gain > GOLD_WIN and cv_gain_result is not None and cv_gain_result.gain > GOLD_WIN and gain_result.times > GOLD_NUM and cv_gain_result.times > GOLD_NUM:
                     gold_centers.append(center)
                     gold_distances.append(distribute_distances.get(i))
 
@@ -285,7 +301,6 @@ with open("./data/daily_price.csv", "r") as src_file:
     for i in range(DAYS, len(test_records) - DAYS):
         k_means_test_records.append(KMeansRecord(test_records, index=i, days=DAYS))
 
-    test_center_real_cnt = {}
     test_gains = {}
     test_center_cnt = {}
     for k_means_record in k_means_test_records:
@@ -293,19 +308,20 @@ with open("./data/daily_price.csv", "r") as src_file:
         for i in range(len(gold_centers)):
             distance = distances[i]
             if distance <= gold_distances[i][0] * DISTANCE_THRESHOLD:
-                cnt = test_center_real_cnt.get(i) if test_center_real_cnt.get(i) != None else 0
-                cnt += 1
-                test_center_real_cnt[i] = cnt
-
-                gain = test_gains.get(i) if test_gains.get(i) != None else 0
-                test_gains[i] = gain + k_means_record.gain
+                gain_result = test_gains.get(i) if test_gains.get(i) is not None else GainResult()
+                gain_result.gain += k_means_record.gain
+                gain_result.times += 1
+                if k_means_record.gain > 0:
+                    gain_result.win_times += 1
+                test_gains[i] = gain_result
 
 
     for key in test_gains.keys():
-        gain = test_gains.get(key)
-        real_cnt = test_center_real_cnt.get(key)
-        test_gains[key] = gain / real_cnt
+        gain_record = test_gains.get(key)
+        gain_record.calculate_gain()
 
-    print("\ncenters = {}".format(gold_centers))
-    print("cneter_real_cnt = {}".format(sort_dictionary(test_center_real_cnt)))
-    print("gains = {}".format(sort_dictionary(test_gains)))
+    gain_records = sort_dictionary(test_gains)
+    print("\ntest\ncenters = {}".format(gold_centers))
+    print("center_real_cnt = {}".format({key: value.times for key, value in test_gains.items()}))
+    print("win_rate = {}".format({key: value.win_rate for key, value in test_gains.items()}))
+    print("gains = {}".format({key: value.gain for key, value in test_gains.items()}))
