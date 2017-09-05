@@ -14,7 +14,9 @@ GOLD_WIN = 0.004
 GOLD_WIN_RATE = 0.6
 GOLD_NUM = 20
 MAX_EPOCH = 100
-NEED_TRAIN = True
+NEED_TRAIN = False
+NEED_TEST = False
+NEED_TEST_YEAR = True
 
 class DailyRecord:
     def __init__(self, date, open, close, high, low, turnover, volume, balance):
@@ -43,6 +45,8 @@ class KMeansRecord:
         self.records = records[index - days + 1: index + 1]
         self.gain = (records[index + int(DAYS / 2)].close - records[index + 1].open)/records[index + 1].open
         features = []
+        self.date = self.records[0].date
+        self.next_open_price = records[index + 1].open
 
         standard_price = self.records[-1].close
         for i in range(len(self.records)):
@@ -121,7 +125,7 @@ with open("./data/daily_price.csv", "r") as src_file:
         records.append(DailyRecord(date, words[open_ix], words[close_ix], words[high_ix], words[low_ix], words[turnover_ix], words[volume_ix], finance_balance.get(date)))
 
     split_index_1 = int(len(records) * 0.6)
-    split_index_2 = int(len(records) * 0.9)
+    split_index_2 = int(len(records) * 0.8)
     train_records = records[:split_index_1]
     cv_records = records[split_index_1: split_index_2]
     test_records = records[split_index_2:]
@@ -313,43 +317,90 @@ with open("./data/daily_price.csv", "r") as src_file:
 
     # test
     # get gold_centers and gold_distances from file
-    gold_centers = None
-    gold_distances = None
-    with open(centers_file_name, 'r') as centers_f , open(distances_file_name, 'r') as distances_f:
-        center_csv_reader = csv.reader(centers_f)
-        gold_centers = list(center_csv_reader)
+    if NEED_TEST:
+        gold_centers = None
+        gold_distances = None
+        with open(centers_file_name, 'r') as centers_f , open(distances_file_name, 'r') as distances_f:
+            center_csv_reader = csv.reader(centers_f)
+            gold_centers = list(center_csv_reader)
 
-        gold_centers = convert_to_float_list(gold_centers)
+            gold_centers = convert_to_float_list(gold_centers)
 
-        distances_csv_reader = csv.reader(distances_f)
-        gold_distances = list(distances_csv_reader)
-        gold_distances = convert_to_float_list(gold_distances)
+            distances_csv_reader = csv.reader(distances_f)
+            gold_distances = list(distances_csv_reader)
+            gold_distances = convert_to_float_list(gold_distances)
 
-    k_means_test_records = []
-    for i in range(DAYS, len(test_records) - DAYS):
-        k_means_test_records.append(KMeansRecord(test_records, index=i, days=DAYS))
+        k_means_test_records = []
+        for i in range(DAYS, len(test_records) - DAYS):
+            k_means_test_records.append(KMeansRecord(test_records, index=i, days=DAYS))
 
-    test_gains = {}
-    test_center_cnt = {}
-    for k_means_record in k_means_test_records:
-        distances = get_distance(k_means_record.features, gold_centers)
-        for i in range(len(gold_centers)):
-            distance = distances[i]
-            if distance <= gold_distances[i][0] * DISTANCE_THRESHOLD:
-                gain_result = test_gains.get(i) if test_gains.get(i) is not None else GainResult()
-                gain_result.gain += k_means_record.gain
-                gain_result.times += 1
-                if k_means_record.gain > 0:
-                    gain_result.win_times += 1
-                test_gains[i] = gain_result
+        test_gains = {}
+        test_center_cnt = {}
+        for k_means_record in k_means_test_records:
+            distances = get_distance(k_means_record.features, gold_centers)
+            for i in range(len(gold_centers)):
+                distance = distances[i]
+                if distance <= gold_distances[i][0] * DISTANCE_THRESHOLD:
+                    gain_result = test_gains.get(i) if test_gains.get(i) is not None else GainResult()
+                    gain_result.gain += k_means_record.gain
+                    gain_result.times += 1
+                    if k_means_record.gain > 0:
+                        gain_result.win_times += 1
+                    test_gains[i] = gain_result
 
 
-    for key in test_gains.keys():
-        gain_record = test_gains.get(key)
-        gain_record.calculate_gain()
+        for key in test_gains.keys():
+            gain_record = test_gains.get(key)
+            gain_record.calculate_gain()
 
-    gain_records = sort_dictionary(test_gains)
-    print("\ntest\ncenters = {}".format(gold_centers))
-    print("center_real_cnt = {}".format({key: value.times for key, value in test_gains.items()}))
-    print("win_rate = {}".format({key: value.win_rate for key, value in test_gains.items()}))
-    print("gains = {}".format({key: value.gain for key, value in test_gains.items()}))
+        gain_records = sort_dictionary(test_gains)
+        print("\ntest\ncenters = {}".format(gold_centers))
+        print("center_real_cnt = {}".format({key: value.times for key, value in test_gains.items()}))
+        print("win_rate = {}".format({key: value.win_rate for key, value in test_gains.items()}))
+        print("gains = {}".format({key: value.gain for key, value in test_gains.items()}))
+
+    if NEED_TEST_YEAR:
+        gold_centers = None
+        gold_distances = None
+        with open(centers_file_name, 'r') as centers_f, open(distances_file_name, 'r') as distances_f:
+            center_csv_reader = csv.reader(centers_f)
+            gold_centers = list(center_csv_reader)
+
+            gold_centers = convert_to_float_list(gold_centers)
+
+            distances_csv_reader = csv.reader(distances_f)
+            gold_distances = list(distances_csv_reader)
+            gold_distances = convert_to_float_list(gold_distances)
+
+        k_means_test_records = []
+        for i in range(DAYS, len(test_records) - DAYS):
+            k_means_test_records.append(KMeansRecord(test_records, index=i, days=DAYS))
+
+        stocks = 0
+        money = 100000
+        curr_year = '2014'
+        gain = 0.0
+        last_buy_index = 0
+        for index in range(len(k_means_test_records)):
+            k_means_record = k_means_test_records[index]
+            year = k_means_record.date[:4]
+            if curr_year != year:
+                print("{}, gains = {}".format(curr_year, money + stocks * k_means_record.next_open_price))
+                curr_year = year
+                gain = 0
+            distances = get_distance(k_means_record.features, gold_centers)
+            for i in range(len(gold_centers)):
+                distance = distances[i]
+                if distance <= gold_distances[i][0] * DISTANCE_THRESHOLD:
+                    if stocks == 0:
+                        print(k_means_record.date)
+                    stock_wanna_buy = money // k_means_record.next_open_price
+                    stocks += stock_wanna_buy
+                    money -= stock_wanna_buy * k_means_record.next_open_price
+                    last_buy_index = index
+
+            if index - last_buy_index >= DAYS / 2:
+                money += stocks * k_means_record.next_open_price
+                stocks = 0
+
+        print("{}, gains = {}".format(curr_year, money + stocks * k_means_record.next_open_price))
