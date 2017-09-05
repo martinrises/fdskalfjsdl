@@ -1,9 +1,6 @@
-from market_state_checker import MarketStateChecker
-import market_state_checker
 import random
 import os
 import csv
-import quanter
 
 DAYS = 10
 CENTER_NUM = 100
@@ -13,9 +10,9 @@ DISTANCE_THRESHOLD = 0.8
 GOLD_WIN = 0.004
 GOLD_WIN_RATE = 0.6
 GOLD_NUM = 20
-MAX_EPOCH = 100
-NEED_TRAIN = False
-NEED_TEST = False
+MAX_EPOCH = 50
+NEED_TRAIN = True
+NEED_TEST = True
 NEED_TEST_YEAR = True
 
 class DailyRecord:
@@ -399,7 +396,7 @@ with open("./data/daily_price.csv", "r") as src_file:
                     money -= stock_wanna_buy * k_means_record.next_open_price
                     last_buy_index = index
 
-            if index - last_buy_index >= DAYS / 2:
+            if index - last_buy_index >= int(DAYS / 2):
                 money += stocks * k_means_record.next_open_price
                 stocks = 0
 
