@@ -13,7 +13,7 @@ DISTANCE_THRESHOLD = 0.8
 GOLD_WIN = 0.004
 GOLD_WIN_RATE = 0.6
 GOLD_NUM = 20
-MAX_EPOCH = 30
+MAX_EPOCH = 100
 NEED_TRAIN = True
 
 class DailyRecord:
@@ -286,16 +286,19 @@ with open("./data/daily_price.csv", "r") as src_file:
         print("\ngold_centers.size = {}".format(len(gold_centers)))
 
         is_file_exist = os.path.isfile(centers_file_name)
+        center_in_file = []
+        if is_file_exist:
+            with open(centers_file_name, "r") as centers_f:
+                center_f_csv_reader = csv.reader(centers_f)
+                center_in_file = list(center_f_csv_reader)
+
         open_mode = "a" if is_file_exist else "w"
         with open(centers_file_name, open_mode, newline='') as centers_f,\
                 open(distances_file_name, open_mode, newline='') as distances_f, \
                 open(win_rate_file_name, open_mode, newline='') as win_rate_f:
+
             center_f_csv_writer = csv.writer(centers_f)
-            center_f_csv_reader = csv.reader(centers_f)
-            center_in_file = list(center_f_csv_reader)
-
             distance_f_csv_writer = csv.writer(distances_f)
-
             win_rate_f_csv_writer = csv.writer(win_rate_f)
 
             for i in range(len(gold_centers)):
@@ -315,6 +318,7 @@ with open("./data/daily_price.csv", "r") as src_file:
     with open(centers_file_name, 'r') as centers_f , open(distances_file_name, 'r') as distances_f:
         center_csv_reader = csv.reader(centers_f)
         gold_centers = list(center_csv_reader)
+
         gold_centers = convert_to_float_list(gold_centers)
 
         distances_csv_reader = csv.reader(distances_f)
