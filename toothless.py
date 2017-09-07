@@ -3,15 +3,17 @@ import labeler
 import tensorflow as tf
 import numpy as np
 
-DAYS = 2
+DAYS = 5
 FEATURE_SIZE = 6
+THRESHOLD = 0.01
 n_input = FEATURE_SIZE * DAYS
-THRESHOLD = 0.02
 n_label = 3
-n_hidden_unit = 50
-learning_rate = 0.001
+n_hidden_layer = 6
+n_hidden_unit = 5
+learning_rate = 0.0001
 batch_size = 30
 max_epoch = 1000
+
 
 SUMMARY_DIR = './summary/'
 
@@ -29,6 +31,11 @@ def get_labels(labeled_records):
         labels.append([record.label])
     return labels
 
+def layer(input, n_input, n_output):
+    W = tf.Variable(tf.random_normal(shape=[n_input, n_output]))
+    b = tf.Variable(tf.random_normal(shape=[n_output]))
+    output = tf.add(tf.matmul(input, W), b)
+    return output
 
 def train():
     origin_records = origin_data_reader.get_origin_records()
@@ -42,11 +49,16 @@ def train():
 
     global_step = tf.Variable(0, trainable=False)
 
-    W1 = tf.Variable(tf.random_normal(shape=[n_input, n_label]))
-    b1 = tf.Variable(tf.random_normal(shape=[n_label]))
-    output1 = tf.add(tf.matmul(input, W1), b1)
+    # first layer
+    output1 = layer(input, n_input, n_hidden_unit)
 
-    output = output1
+    hidden_output = hidden_input = output1
+    for _ in range(n_hidden_layer - 2):
+        hidden_input = hidden_output = layer(hidden_input, n_hidden_unit, n_hidden_unit)
+
+    # last layer
+    output = layer(hidden_output, n_hidden_unit, n_label)
+
     loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=target, logits=output))
     optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate).minimize(loss, global_step=global_step)
 
