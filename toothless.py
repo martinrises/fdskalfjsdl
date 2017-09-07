@@ -13,6 +13,8 @@ learning_rate = 0.001
 batch_size = 30
 max_epoch = 1000
 
+SUMMARY_DIR = './summary/'
+
 
 def get_features(labeled_records):
     features = []
@@ -38,15 +40,22 @@ def train():
     input = tf.placeholder(dtype=tf.float32, shape=[None, n_input])
     target = tf.placeholder(dtype=tf.float32, shape=[None, n_label])
 
+    global_step = tf.Variable(0, trainable=False)
+
     W1 = tf.Variable(tf.random_normal(shape=[n_input, n_label]))
     b1 = tf.Variable(tf.random_normal(shape=[n_label]))
     output1 = tf.add(tf.matmul(input, W1), b1)
 
     output = output1
     loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=target, logits=output))
-    optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate).minimize(loss)
+    optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate).minimize(loss, global_step=global_step)
+
+    with tf.name_scope("summary"):
+        tf.summary.scalar("loss", loss)
+        merged_summary = tf.summary.merge_all()
 
     with tf.Session() as sess:
+        summary_writer = tf.summary.FileWriter(SUMMARY_DIR, sess.graph)
         sess.run(tf.global_variables_initializer())
 
         for epoch in range(max_epoch):
@@ -59,8 +68,9 @@ def train():
                 target_data = get_labels(batch_records)
                 target_data = np.reshape(target_data, [batch_size, n_label])
 
-                _, data_loss = sess.run([optimizer, loss], feed_dict={input:input_data, target:target_data})
+                _, data_loss, summary = sess.run([optimizer, loss, merged_summary], feed_dict={input:input_data, target:target_data})
                 if iteration + 1 == iter_size:
+                    summary_writer.add_summary(summary, global_step=epoch)
                     print("epoch #{}, loss = {}".format(epoch, data_loss))
 
 train()
