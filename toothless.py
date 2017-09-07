@@ -4,15 +4,15 @@ import tensorflow as tf
 import numpy as np
 
 DAYS = 5
-FEATURE_SIZE = 6
+FEATURE_SIZE = 4
 THRESHOLD = 0.01
 n_input = FEATURE_SIZE * DAYS
 n_label = 3
-n_hidden_layer = 6
+n_hidden_layer = 3
 n_hidden_unit = 5
 learning_rate = 0.0001
 batch_size = 30
-max_epoch = 1000
+max_epoch = 5000
 
 
 SUMMARY_DIR = './summary/'
@@ -63,7 +63,7 @@ def train():
     optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate).minimize(loss, global_step=global_step)
 
     with tf.name_scope("summary"):
-        tf.summary.scalar("loss", loss)
+        tf.summary.scalar("loss: days={},threshold={},hidden_layer={},hidden_unit={},lr={},max_epoch={}".format(DAYS, THRESHOLD, n_hidden_layer, n_hidden_unit, learning_rate, max_epoch), loss)
         merged_summary = tf.summary.merge_all()
 
     with tf.Session() as sess:
