@@ -10,12 +10,13 @@ n_input = FEATURE_SIZE * DAYS
 n_label = 3
 n_hidden_layer = 3
 n_hidden_unit = 5
-learning_rate = 0.0001
+learning_rate = 0.001
 batch_size = 30
-max_epoch = 5000
+max_epoch = 10000
 
 
 SUMMARY_DIR = './summary/'
+CKPT_DIR = './model/{}/{}/{}/{}'.format(FEATURE_SIZE, n_hidden_layer, n_hidden_unit, learning_rate)
 
 
 def get_features(labeled_records):
@@ -66,9 +67,17 @@ def train():
         tf.summary.scalar("loss: days={},threshold={},hidden_layer={},hidden_unit={},lr={},max_epoch={}".format(DAYS, THRESHOLD, n_hidden_layer, n_hidden_unit, learning_rate, max_epoch), loss)
         merged_summary = tf.summary.merge_all()
 
+    saver = tf.train.Saver()
+
     with tf.Session() as sess:
         summary_writer = tf.summary.FileWriter(SUMMARY_DIR, sess.graph)
-        sess.run(tf.global_variables_initializer())
+
+
+        ckpt = tf.train.get_checkpoint_state(CKPT_DIR)
+        if ckpt and ckpt.model_checkpoint_path:
+            saver.restore(sess, ckpt.model_checkpoint_path)
+        else:
+            sess.run(tf.global_variables_initializer())
 
         for epoch in range(max_epoch):
             iter_size = len(labeled_records) // batch_size
@@ -84,5 +93,8 @@ def train():
                 if iteration + 1 == iter_size:
                     summary_writer.add_summary(summary, global_step=epoch)
                     print("epoch #{}, loss = {}".format(epoch, data_loss))
+
+            if (epoch + 1) % 1000 == 0:
+                saver.save(sess, CKPT_DIR, global_step=epoch)
 
 train()
