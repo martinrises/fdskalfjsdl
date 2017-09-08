@@ -6,7 +6,7 @@ import random
 
 DAYS = 5
 FEATURE_SIZE = 4
-THRESHOLD = 0.01
+THRESHOLD = 0.2
 n_input = FEATURE_SIZE * DAYS
 n_label = 3
 n_hidden_layer = 3

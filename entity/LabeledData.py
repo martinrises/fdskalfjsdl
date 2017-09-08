@@ -1,3 +1,5 @@
+import math
+
 class LabeledData:
     def __init__(self, records, index, days, threshold):
         self.records = records
@@ -8,15 +10,18 @@ class LabeledData:
 
     @property
     def label(self):
+        high = max([r.high for r in self.records][self.index - self.days: self.index + 1])
+        low = min([r.low for r in self.records][self.index - self.days: self.index + 1])
         curr_record = self.records[self.index]
         future_record = self.records[self.index + int(self.days/ 2)]
-        delta =  future_record.close - curr_record.close
-        if delta > 0 and delta > curr_record.close * self.threshold:
-            return [0, 0, 1]
-        elif delta < 0 and -delta > curr_record.close * self.threshold:
-            return [1, 0, 0]
+        delta_threshold = (high - low) * self.threshold
+        delta = future_record.close - curr_record.close
+        if delta > 0 and delta > delta_threshold:
+            return 2
+        elif delta < 0 and -delta > delta_threshold:
+            return 0
         else:
-            return [0, 1, 0]
+            return 1
 
     @property
     def features(self):
