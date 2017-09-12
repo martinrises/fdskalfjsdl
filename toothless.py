@@ -2,6 +2,7 @@ import random
 
 import numpy as np
 import tensorflow as tf
+import shutil
 
 import labeler
 import origin_data_reader
@@ -52,6 +53,12 @@ def get_random_segment(records, batch_size = batch_size):
 
 
 def train():
+
+    # delete summary
+    shutil.rmtree(TRAIN_SUMMARY_DIR)
+    shutil.rmtree(CV_SUMMARY_DIR)
+    shutil.rmtree(TEST_SUMMARY_DIR)
+
     origin_records = origin_data_reader.get_origin_records()
 
     # convert origin data to assembled data
