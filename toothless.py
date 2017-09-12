@@ -24,7 +24,7 @@ SUMMARY_DIR = './summary'
 TRAIN_SUMMARY_DIR = SUMMARY_DIR+"/train"
 CV_SUMMARY_DIR = SUMMARY_DIR+"/cv"
 TEST_SUMMARY_DIR = SUMMARY_DIR+"/test"
-CKPT_DIR = './model/{}/{}/{}/{}'.format(FEATURE_SIZE, n_hidden_layer, n_hidden_unit, learning_rate)
+CKPT_DIR = './model/{}/{}/{}/'.format(FEATURE_SIZE, n_hidden_layer, n_hidden_unit)
 
 
 def get_features(labeled_records):
@@ -155,8 +155,9 @@ def transaction():
             record = test_records[i]
             actual_input = np.reshape(get_features([record]), [1, n_input])
             output_vector = sess.run(output, feed_dict={input: actual_input})
+            print("{}, {}, {}, {}, {}".format(record.date, output_vector, np.argmax(output_vector), record.label, np.argmax(record.label)))
             checker.on_day_triggerd(i, output_vector)
 
         checker.finish(len(test_records) - 2)
 
-train()
+transaction()
