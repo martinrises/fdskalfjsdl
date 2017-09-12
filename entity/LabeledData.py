@@ -39,3 +39,15 @@ class LabeledData:
     @property
     def date(self):
         return self.records[self.index].date
+
+    @property
+    def open(self):
+        return self.records[self.index].open
+
+    @property
+    def close(self):
+        return self.records[self.index].close
+
+    @property
+    def year(self):
+        return self.records[self.index].date.split('-')[0]

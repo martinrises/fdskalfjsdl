@@ -1,8 +1,11 @@
-import origin_data_reader
-import labeler
-import tensorflow as tf
-import numpy as np
 import random
+
+import numpy as np
+import tensorflow as tf
+
+import labeler
+import origin_data_reader
+from checker.nn_market_checker import NnMarketChecker
 
 DAYS = 60
 FEATURE_SIZE = 4
@@ -21,6 +24,7 @@ TRAIN_SUMMARY_DIR = SUMMARY_DIR+"/train"
 CV_SUMMARY_DIR = SUMMARY_DIR+"/cv"
 TEST_SUMMARY_DIR = SUMMARY_DIR+"/test"
 CKPT_DIR = './model/{}/{}/{}/{}'.format(FEATURE_SIZE, n_hidden_layer, n_hidden_unit, learning_rate)
+CKPT_DIR = './model/{}/{}/{}/'.format(FEATURE_SIZE, n_hidden_layer, n_hidden_unit)
 
 
 def get_features(labeled_records):
@@ -59,20 +63,7 @@ def train():
     test_records = labeled_records[len(cv_records):]
 
     # conduct neural network
-    input = tf.placeholder(dtype=tf.float32, shape=[None, n_input])
-    target = tf.placeholder(dtype=tf.float32, shape=[None, n_label])
-
-    global_step = tf.Variable(0, trainable=False)
-
-    # first layer
-    output1 = layer(input, n_input, n_hidden_unit)
-
-    hidden_output = hidden_input = output1
-    for _ in range(n_hidden_layer - 2):
-        hidden_input = hidden_output = layer(hidden_input, n_hidden_unit, n_hidden_unit)
-
-    # last layer
-    output = layer(hidden_output, n_hidden_unit, n_label)
+    global_step, input, output, target = get_neural_network()
 
     loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=target, logits=output))
     optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate).minimize(loss, global_step=global_step)
@@ -119,4 +110,41 @@ def train():
             if (epoch + 1) % 1000 == 0:
                 saver.save(sess, CKPT_DIR, global_step=epoch)
 
-train()
+
+def get_neural_network():
+    input = tf.placeholder(dtype=tf.float32, shape=[None, n_input])
+    target = tf.placeholder(dtype=tf.float32, shape=[None, n_label])
+    global_step = tf.Variable(0, trainable=False)
+    # first layer
+    output1 = layer(input, n_input, n_hidden_unit)
+    hidden_output = hidden_input = output1
+    for _ in range(n_hidden_layer - 2):
+        hidden_input = hidden_output = layer(hidden_input, n_hidden_unit, n_hidden_unit)
+
+    # last layer
+    output = layer(hidden_output, n_hidden_unit, n_label)
+    return global_step, input, output, target
+
+def transaction():
+    origin_records = origin_data_reader.get_origin_records()
+    labeled_records = labeler.label_reocrd(origin_records, DAYS, THRESHOLD)
+    length = len(labeled_records)
+    test_records = labeled_records[int(0.8 * length):]
+
+    _global_step, input, _output, _target = get_neural_network()
+    output = tf.nn.softmax(_output)
+    saver = tf.train.Saver()
+    checker = NnMarketChecker(test_records)
+
+    with tf.Session() as sess:
+        saver.restore(sess, CKPT_DIR + '0.001-3999')
+
+        for i in range(len(test_records) - 2):
+            record = test_records[i]
+            actual_input = np.reshape(get_features([record]), [1, n_input])
+            output_vector = sess.run(output, feed_dict={input: actual_input})
+            checker.on_day_triggerd(i, output_vector)
+
+        checker.finish(len(test_records) - 2)
+
+transaction()

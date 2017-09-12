@@ -1,4 +1,4 @@
-from quanter import Quanter
+from checker.quanter import Quanter
 
 MARKET_STATE_UP = 2
 MARKET_STATE_SHAKE = 1
