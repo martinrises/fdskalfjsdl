@@ -5,7 +5,7 @@ import numpy as np
 import csv
 
 result = {}
-day = 200
+day = 12
 threshold = 0.2
 
 
