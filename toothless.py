@@ -23,7 +23,7 @@ SUMMARY_DIR = './summary'
 TRAIN_SUMMARY_DIR = SUMMARY_DIR+"/train"
 CV_SUMMARY_DIR = SUMMARY_DIR+"/cv"
 TEST_SUMMARY_DIR = SUMMARY_DIR+"/test"
-CKPT_DIR = './model/{}/{}/{}/{}/{}/{}'.format(DAYS, THRESHOLD, FEATURE_SIZE, n_hidden_layer, n_hidden_unit, learning_rate)
+CKPT_DIR = './model/{}/{}/{}/{}'.format(FEATURE_SIZE, n_hidden_layer, n_hidden_unit, learning_rate)
 
 
 def get_features(labeled_records):
@@ -98,8 +98,7 @@ def train():
                     train_writer.add_summary(train_summary, global_step=epoch)
                     print("epoch #{}, loss = {}".format(epoch, data_loss))
 
-            if (epoch + 1) % 100 == 0:
-                saver.save(sess, CKPT_DIR, global_step=epoch)
+            if (epoch + 1) % 50 == 0:
                 batch_cv_records = get_random_segment(cv_records)
                 cv_summary = sess.run(merged_summary, feed_dict={
                     input: np.reshape(get_features(batch_cv_records), [batch_size, n_input]),
@@ -111,6 +110,10 @@ def train():
                     input: np.reshape(get_features(batch_test_records), [batch_size, n_input]),
                     target: np.reshape(get_labels(batch_test_records), [batch_size, n_label])})
                 test_writer.add_summary(test_summary, global_step=epoch)
+
+
+            if (epoch + 1) % 100 == 0:
+                saver.save(sess, CKPT_DIR, global_step=epoch)
 
 
 def get_neural_network():
