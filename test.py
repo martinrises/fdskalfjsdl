@@ -2,6 +2,7 @@ import origin_data_reader
 import labeler
 import matplotlib.pyplot as plt
 import numpy as np
+import csv
 
 result = {}
 
@@ -23,14 +24,18 @@ def get_change_counts(records):
             down_cnt += 1
     return internal_cnt, up_cnt, shake_cnt, down_cnt
 
+result_file = open("./data/label_result.csv", 'w', newline="")
+result_writer = csv.writer(result_file)
 
-for day  in range(2, 61):
+origin_records = origin_data_reader.get_origin_records()
+for day in range(2, 101):
     for threshold in np.linspace(start=0.05, stop=1.05, num=20):
-        origin_records = origin_data_reader.get_origin_records()
         records = labeler.label_reocrd(origin_records, day, threshold)
         cnt, up_cnt, shake_cnt, down_cnt = get_change_counts(records)
-        print("{}_{} >>> {}".format(day, threshold, cnt / min([up_cnt, shake_cnt, down_cnt]) * sum([up_cnt, shake_cnt, down_cnt])))
+        print("{}_{} >>> {}, cnt = {}, up_cnt = {}, shake_cnt = {} ,down_cnt = {}".format(day, threshold, cnt / min([up_cnt, shake_cnt, down_cnt]) * sum([up_cnt, shake_cnt, down_cnt]), cnt, up_cnt, shake_cnt, down_cnt))
+        result_writer.writerow(["{}_{}".format(day, threshold), cnt / min([up_cnt, shake_cnt, down_cnt]) * sum([up_cnt, shake_cnt, down_cnt]), cnt, up_cnt, shake_cnt, down_cnt])
         result["{}_{}".format(day, threshold)] = cnt / min([up_cnt, shake_cnt, down_cnt]) * sum([up_cnt, shake_cnt, down_cnt])
 
 result = {item[0]: item[1] for item in sorted(result.items(), key=lambda item: item[1])}
-print(result)
+result_file.close()
+print("result = \n{}".format(result))

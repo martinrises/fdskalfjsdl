@@ -1,4 +1,4 @@
-import market_state_checker
+from checker import market_state_checker
 
 INIT_MONEY = 1000000
 
@@ -61,7 +61,8 @@ class Quanter:
                 end_assets,
                 str(100 * (end_assets - start_assets) / start_assets) + "%"
             ))
-        print("shake = {}, turnover = {}, finish, assets = {},\t win = {},\t max_fallback = {}".format(market_state_checker.THRESHOLD_SHAKE_SIGNAL, market_state_checker.THRESHOLD_TURNOVER_SIGHAL, self._assets, str(100 * (self._assets - INIT_MONEY) / INIT_MONEY) + "%", str(100 * (self._high - self._low) / self._high) + "%"))
+        print("shake = {}, turnover = {}, finish, assets = {},\t win = {},\t max_fallback = {}".format(
+            market_state_checker.THRESHOLD_SHAKE_SIGNAL, market_state_checker.THRESHOLD_TURNOVER_SIGHAL, self._assets, str(100 * (self._assets - INIT_MONEY) / INIT_MONEY) + "%", str(100 * (self._high - self._low) / self._high) + "%"))
         self._money = INIT_MONEY
         self._stock = 0
         self._borrow = 0

@@ -17,11 +17,11 @@ class LabeledData:
         delta_threshold = (high - low) * self.threshold
         delta = future_record.close - curr_record.close
         if delta > 0 and delta > delta_threshold:
-            return 2
+            return [1, 0, 0]
         elif delta < 0 and -delta > delta_threshold:
-            return 0
+            return [0, 0, 1]
         else:
-            return 1
+            return [0, 1, 0]
 
     @property
     def features(self):

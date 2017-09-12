@@ -4,7 +4,7 @@ import tensorflow as tf
 import numpy as np
 import random
 
-DAYS = 5
+DAYS = 60
 FEATURE_SIZE = 4
 THRESHOLD = 0.2
 n_input = FEATURE_SIZE * DAYS
