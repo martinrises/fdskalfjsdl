@@ -144,7 +144,8 @@ def transaction():
     checker = NnMarketChecker(test_records)
 
     with tf.Session() as sess:
-        saver.restore(sess, CKPT_DIR + '-399')
+        ckpt = tf.train.get_checkpoint_state(CKPT_DIR)
+        saver.restore(sess, ckpt.model_checkpoint_path)
 
         for i in range(len(test_records) - 2):
             record = test_records[i]
