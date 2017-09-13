@@ -11,7 +11,7 @@ class Quanter:
         self.borrow = 0
         self.high = 0
         self.low = 9999999999
-        self.year_record = [("2014", INIT_MONEY)]
+        self.year_record = [("0000", INIT_MONEY)]
         self._start_assets = 0
 
     @property
