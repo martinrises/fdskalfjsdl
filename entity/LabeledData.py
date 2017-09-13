@@ -10,6 +10,9 @@ class LabeledData:
 
     @property
     def label(self):
+        if self.index + int(self.days/ 2) >= len(self.records):
+            return [0, 0, 0]
+
         high = max([r.high for r in self.records][self.index - self.days: self.index + 1])
         low = min([r.low for r in self.records][self.index - self.days: self.index + 1])
         curr_record = self.records[self.index]
