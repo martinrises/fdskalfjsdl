@@ -12,6 +12,7 @@ class Quanter:
         self.high = 0
         self.low = 9999999999
         self.year_record = [("2014", INIT_MONEY)]
+        self._start_assets = 0
 
     @property
     def money(self):
@@ -53,6 +54,7 @@ class Quanter:
             stock = self.money // open_next_day
             self.stock += stock
             self.money -= stock * open_next_day
+            self._start_assets = self.assets(open_next_day)
             print("{} buy, assets = {}".format(next_day_record.date, self.assets(open_next_day)))
         elif new_state == MARKET_STATE_SHAKE:
             self.quit_market(next_day_record)
@@ -61,6 +63,7 @@ class Quanter:
             borrow = self.money // open_next_day
             self.borrow += borrow
             self.money += borrow * open_next_day
+            self._start_assets = self.assets(open_next_day)
             print("{} borrow, assets = {}".format(next_day_record.date, self.assets(open_next_day)))
 
     def quit_market(self, next_day_record):
@@ -71,6 +74,7 @@ class Quanter:
         if self.borrow > 0:
             self.money -= self.borrow * open_next_day
             self.borrow = 0
+        self._start_assets = 0
 
     def finish(self, next_day_record):
         self.quit_market(next_day_record)
@@ -92,3 +96,8 @@ class Quanter:
 
     def on_year_change(self, last_year, curr_year, record):
         self.year_record.append((last_year, self.assets(record.close)))
+
+    def on_day_trigger(self, curr_record, next_record):
+        if self._start_assets != 0 and (self.assets(curr_record.close) - self._start_assets) / self._start_assets < -0.03:
+            print("wrong operation, loss = {}".format((self.assets(curr_record.close) - self._start_assets) / self._start_assets))
+            self.quit_market(next_record)
