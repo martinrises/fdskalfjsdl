@@ -8,7 +8,7 @@ import labeler
 import origin_data_reader
 from checker.nn_market_checker import NnMarketChecker
 
-DAYS = 12
+DAYS = 18
 FEATURE_SIZE = 4
 THRESHOLD = 0.2
 n_input = FEATURE_SIZE * DAYS
@@ -53,12 +53,6 @@ def get_random_segment(records, batch_size = batch_size):
 
 
 def train():
-
-    # delete summary
-    shutil.rmtree(TRAIN_SUMMARY_DIR)
-    shutil.rmtree(CV_SUMMARY_DIR)
-    shutil.rmtree(TEST_SUMMARY_DIR)
-
     origin_records = origin_data_reader.get_origin_records()
 
     # convert origin data to assembled data
@@ -100,27 +94,28 @@ def train():
                 input_data = np.reshape(get_features(batch_records), [batch_size, n_input])
                 target_data = np.reshape(get_labels(batch_records), [batch_size, n_label])
 
-                _, data_loss, train_summary = sess.run([optimizer, loss, merged_summary], feed_dict={input:input_data, target:target_data})
+                _ = sess.run(optimizer, feed_dict={input:input_data, target:target_data})
                 if iteration + 1 == iter_size:
-                    train_writer.add_summary(train_summary, global_step=epoch)
-                    print("epoch #{}, loss = {}".format(epoch, data_loss))
+                    data_loss, train_summary = sess.run([loss, merged_summary], feed_dict={input:input_data, target:target_data})
+                    train_writer.add_summary(train_summary, global_step=(global_step.eval(sess) // iter_size))
+                    print("epoch #{}, loss = {}".format((global_step.eval(sess) // iter_size), data_loss))
 
-            if (epoch + 1) % 50 == 0:
+            if (global_step.eval(sess) // iter_size) % 10 == 0:
                 batch_cv_records = get_random_segment(cv_records)
                 cv_summary = sess.run(merged_summary, feed_dict={
                     input: np.reshape(get_features(batch_cv_records), [batch_size, n_input]),
                     target: np.reshape(get_labels(batch_cv_records), [batch_size, n_label])})
-                cv_writer.add_summary(cv_summary, global_step=epoch)
+                cv_writer.add_summary(cv_summary, global_step=(global_step.eval(sess) // iter_size))
 
                 batch_test_records = get_random_segment(test_records)
                 test_summary = sess.run(merged_summary, feed_dict={
                     input: np.reshape(get_features(batch_test_records), [batch_size, n_input]),
                     target: np.reshape(get_labels(batch_test_records), [batch_size, n_label])})
-                test_writer.add_summary(test_summary, global_step=epoch)
+                test_writer.add_summary(test_summary, global_step=(global_step.eval(sess) // iter_size))
 
 
-            if (epoch + 1) % 100 == 0:
-                saver.save(sess, CKPT_DIR, global_step=epoch)
+            if ((global_step.eval(sess) // iter_size) + 1) % 100 == 0:
+                saver.save(sess, CKPT_DIR, global_step=(global_step.eval(sess) // iter_size))
 
 
 def get_neural_network():
@@ -141,7 +136,7 @@ def transaction():
     origin_records = origin_data_reader.get_origin_records()
     labeled_records = labeler.label_reocrd(origin_records, DAYS, THRESHOLD)
     length = len(labeled_records)
-    test_records = labeled_records[int(0.8 * length):]
+    test_records = labeled_records[int(0.6 * length):]
 
     _global_step, input, _output, _target = get_neural_network()
     output = tf.nn.softmax(_output)
@@ -149,15 +144,16 @@ def transaction():
     checker = NnMarketChecker(test_records)
 
     with tf.Session() as sess:
-        saver.restore(sess, CKPT_DIR + '0.001-3999')
+        ckpt = tf.train.get_checkpoint_state(CKPT_DIR)
+        saver.restore(sess, ckpt.model_checkpoint_path)
 
         for i in range(len(test_records) - 2):
             record = test_records[i]
             actual_input = np.reshape(get_features([record]), [1, n_input])
             output_vector = sess.run(output, feed_dict={input: actual_input})
-            print("{}, {}, {}, {}, {}".format(record.date, output_vector, np.argmax(output_vector), record.label, np.argmax(record.label)))
+            print("{}, {}, {}, {}, {}, {}".format(record.date, output_vector, np.argmax(output_vector), record.label, np.argmax(record.label), record.close))
             checker.on_day_triggerd(i, output_vector)
 
         checker.finish(len(test_records) - 2)
 
-transaction()
+train()
