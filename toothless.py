@@ -2,14 +2,13 @@ import random
 
 import numpy as np
 import tensorflow as tf
-import shutil
 
 import labeler
 import origin_data_reader
 from checker.nn_market_checker import NnMarketChecker
 
 DAYS = 12
-FEATURE_SIZE = 4
+FEATURE_SIZE = 2
 THRESHOLD = 0.2
 n_input = FEATURE_SIZE * DAYS
 n_label = 3
@@ -25,7 +24,7 @@ TRAIN_SUMMARY_DIR = SUMMARY_DIR+"/train"
 CV_SUMMARY_DIR = SUMMARY_DIR+"/cv"
 TEST_SUMMARY_DIR = SUMMARY_DIR+"/test"
 CKPT_DIR = './model/{}/{}/{}/'.format(FEATURE_SIZE, n_hidden_layer, n_hidden_unit)
-ACTUAL_CKPT_DIR = './model/12/0.2/4/3/5'
+ACTUAL_CKPT_DIR = './model/2/3/5'
 
 
 def get_features(labeled_records):
@@ -54,10 +53,10 @@ def get_random_segment(records, batch_size = batch_size):
 
 
 def train():
-    origin_records = origin_data_reader.get_origin_records()
+    origin_records = origin_data_reader.get_balance_records()
 
     # convert origin data to assembled data
-    labeled_records = labeler.label_reocrd(origin_records, DAYS, THRESHOLD)
+    labeled_records = labeler.label_balance_reocrd(origin_records, DAYS, THRESHOLD)
     length = len(labeled_records)
     train_records = labeled_records[:int(0.6 * length)]
     cv_records = labeled_records[len(train_records):int(0.8 * length)]
@@ -134,10 +133,10 @@ def get_neural_network():
     return global_step, input, output, target
 
 def transaction():
-    origin_records = origin_data_reader.get_origin_records()
-    labeled_records = labeler.label_reocrd(origin_records, DAYS, THRESHOLD)
+    origin_records = origin_data_reader.get_balance_records()
+    labeled_records = labeler.label_balance_reocrd(origin_records, DAYS, THRESHOLD)
     length = len(labeled_records)
-    test_records = labeled_records[int(0.6 * length):]
+    test_records = labeled_records
 
     _global_step, input, _output, _target = get_neural_network()
     output = tf.nn.softmax(_output)
@@ -158,8 +157,8 @@ def transaction():
         checker.finish(len(test_records) - 2)
 
 def predict():
-    origin_records = origin_data_reader.get_origin_records()
-    labeled_records = labeler.get_input_record(origin_records, DAYS, THRESHOLD)
+    origin_records = origin_data_reader.get_balance_records()
+    labeled_records = labeler.get_price_feature_record(origin_records, DAYS, THRESHOLD)
 
     _global_step, input, _output, _target = get_neural_network()
     output = tf.nn.softmax(_output)
@@ -177,4 +176,4 @@ def predict():
             print("{}, {}, {}, {}, {}, {}".format(record.date, output_vector, np.argmax(output_vector), record.label, np.argmax(record.label), record.close))
 
 
-predict()
+transaction()
