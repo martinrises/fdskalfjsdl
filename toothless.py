@@ -8,7 +8,7 @@ import labeler
 import origin_data_reader
 from checker.nn_market_checker import NnMarketChecker
 
-DAYS = 18
+DAYS = 12
 FEATURE_SIZE = 4
 THRESHOLD = 0.2
 n_input = FEATURE_SIZE * DAYS
@@ -25,6 +25,7 @@ TRAIN_SUMMARY_DIR = SUMMARY_DIR+"/train"
 CV_SUMMARY_DIR = SUMMARY_DIR+"/cv"
 TEST_SUMMARY_DIR = SUMMARY_DIR+"/test"
 CKPT_DIR = './model/{}/{}/{}/'.format(FEATURE_SIZE, n_hidden_layer, n_hidden_unit)
+ACTUAL_CKPT_DIR = './model/12/0.2/4/3/5'
 
 
 def get_features(labeled_records):
@@ -144,7 +145,7 @@ def transaction():
     checker = NnMarketChecker(test_records)
 
     with tf.Session() as sess:
-        ckpt = tf.train.get_checkpoint_state(CKPT_DIR)
+        ckpt = tf.train.get_checkpoint_state(ACTUAL_CKPT_DIR)
         saver.restore(sess, ckpt.model_checkpoint_path)
 
         for i in range(len(test_records) - 2):
@@ -156,4 +157,24 @@ def transaction():
 
         checker.finish(len(test_records) - 2)
 
-train()
+def predict():
+    origin_records = origin_data_reader.get_origin_records()
+    labeled_records = labeler.get_input_record(origin_records, DAYS, THRESHOLD)
+
+    _global_step, input, _output, _target = get_neural_network()
+    output = tf.nn.softmax(_output)
+    saver = tf.train.Saver()
+
+    with tf.Session() as sess:
+        ckpt = tf.train.get_checkpoint_state(ACTUAL_CKPT_DIR)
+        saver.restore(sess, ckpt.model_checkpoint_path)
+
+        input_records = labeled_records[-120:]
+        for i in range(len(input_records)):
+            record = input_records[i]
+            actual_input = np.reshape(get_features([record]), [1, n_input])
+            output_vector = sess.run(output, feed_dict={input: actual_input})
+            print("{}, {}, {}, {}, {}, {}".format(record.date, output_vector, np.argmax(output_vector), record.label, np.argmax(record.label), record.close))
+
+
+predict()
