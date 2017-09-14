@@ -34,11 +34,11 @@ class NnMarketChecker:
 
         # state
         if new_state != self.state:
-            self.__quanter.on_market_state_change(self.state, new_state, self.records[index+1])
+            self.__quanter.on_market_state_change(self.state, new_state, self.records[index+1], index)
             self.__state = new_state
 
         # daily interest check
-        self.__quanter.on_day_trigger(self.records[index], self.records[index + 1])
+        self.__quanter.on_day_trigger(self.records[index], self.records[index + 1], index)
 
         # year
         year = self.records[index].year
