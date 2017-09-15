@@ -5,7 +5,7 @@ data_indices = ['601328.XSHG', '600519.XSHG', '601688.XSHG', '601901.XSHG', '600
 
 
 def save_csv(filename, content_str):
-    with open('../data/sz50/{}.csv'.format(filename), 'w', newline='') as f:
+    with open('../data/b50/{}.csv'.format(filename), 'w', newline='') as f:
         f.write(content_str)
 
 

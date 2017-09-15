@@ -31,3 +31,12 @@ def get_balance_feature_record(records, days, threshold):
         labeled_records.append(BalanceLabeledData(records, i, days, threshold))
 
     return labeled_records
+
+def get_b50_feature_record(records, days, threshold):
+    labeled_records_result = []
+    for record_list in records:
+        labeled_records = []
+        for i in range(days, len(record_list)):
+            labeled_records.append(LabeledData(record_list, i, days, threshold))
+        labeled_records_result.append(labeled_records)
+    return labeled_records_result

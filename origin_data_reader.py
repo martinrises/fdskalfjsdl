@@ -1,7 +1,7 @@
 import pandas as pd
 from entity.OriginRecord import OriginRecord
 from entity.BalanceRecord import BalanceRecord
-import numpy as np
+import os
 
 def read_origin_data(path='./data/daily_price.csv'):
     '''
@@ -30,16 +30,6 @@ def get_origin_records(path='./data/daily_price.csv'):
                                     df.volume[i],
                                     df.total_turnover[i]))
     f.close()
-    # 2005-01-04,1260.782,1242.774,1260.782,1238.179,4418452047.0,816177000.0
-    first_record = records[0]
-    assert first_record.date == '2005-01-04'
-    assert str(first_record.open) == '1260.782'
-    assert str(first_record.close) == '1242.774'
-    assert str(first_record.high) == '1260.782'
-    assert str(first_record.low) == '1238.179'
-    assert str(first_record.volume) == '816177000.0'
-    assert str(first_record.turnover) == '4418452047.0'
-
     return records
 
 
@@ -66,3 +56,10 @@ def get_balance_records(price_path='./data/daily_price.csv', balance_path='./dat
                                              balance))
     balance_f.close()
     return sorted(balance_records, key=lambda r: r.date)
+
+def get_b50_records(path="./data/b50/"):
+    file_names = os.listdir(path)
+    records = []
+    for f_name in file_names:
+        records.append(get_origin_records('./data/b50/' + f_name))
+    return records
