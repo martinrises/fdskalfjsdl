@@ -16,15 +16,15 @@ class LabeledData:
         high = max([r.high for r in self.records][self.index - self.days: self.index + 1])
         low = min([r.low for r in self.records][self.index - self.days: self.index + 1])
         curr_record = self.records[self.index]
-        future_record = self.records[self.index + int(self.days/ 2)]
+        future_record = self.records[self.index + int(self.days/3)]
         delta_threshold = (high - low) * self.threshold
         delta = future_record.close - curr_record.close
         if delta > 0 and delta > delta_threshold:
-            return [1, 0, 0]
+            return 0
         elif delta < 0 and -delta > delta_threshold:
-            return [0, 0, 1]
+            return 1
         else:
-            return [0, 1, 0]
+            return 2
 
     @property
     def features(self):

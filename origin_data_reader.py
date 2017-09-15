@@ -61,5 +61,5 @@ def get_b50_records(path="./data/b50/"):
     file_names = os.listdir(path)
     records = []
     for f_name in file_names:
-        records.append(get_origin_records('./data/b50/' + f_name))
+        records.append(get_origin_records(path + f_name))
     return records
