@@ -8,14 +8,14 @@ import origin_data_reader
 from checker.nn_market_checker import NnMarketChecker
 
 DAYS = 12
-FEATURE_SIZE = 4
+FEATURE_SIZE = 1
 THRESHOLD = 0.2
 n_input = FEATURE_SIZE * DAYS
 n_label = 3
 n_hidden_layer = 3
 n_hidden_unit = 5
 learning_rate = 0.001
-batch_size = 30
+batch_size = 300
 max_epoch = 10000
 
 
@@ -24,7 +24,7 @@ TRAIN_SUMMARY_DIR = SUMMARY_DIR+"/train"
 CV_SUMMARY_DIR = SUMMARY_DIR+"/cv"
 TEST_SUMMARY_DIR = SUMMARY_DIR+"/test"
 CKPT_DIR = './model/{}/{}/{}/'.format(FEATURE_SIZE, n_hidden_layer, n_hidden_unit)
-ACTUAL_CKPT_DIR = './model/12/0.2/4/3/5'
+ACTUAL_CKPT_DIR = './model/4/5/5'
 
 
 def get_features(labeled_records):
@@ -53,14 +53,21 @@ def get_random_segment(records, batch_size = batch_size):
 
 
 def train():
-    origin_records = origin_data_reader.get_origin_records()
+    origin_records = origin_data_reader.get_b50_records()
 
     # convert origin data to assembled data
-    labeled_records = labeler.label_price_reocrd(origin_records, DAYS, THRESHOLD)
-    length = len(labeled_records)
-    train_records = labeled_records[:int(0.6 * length)]
-    cv_records = labeled_records[len(train_records):int(0.8 * length)]
-    test_records = labeled_records[len(cv_records):]
+    labeled_records_list = labeler.get_b50_feature_record(origin_records, DAYS, THRESHOLD)
+    train_records_list = []
+    cv_records_list = []
+    test_records_list = []
+    for labeled_records in labeled_records_list:
+        length = len(labeled_records)
+        train_records_list.append(labeled_records[:int(0.6 * length)])
+        cv_records_list.append(labeled_records[int(0.6 * length):int(0.8 * length)])
+        test_records_list.append(labeled_records[int(0.8 * length):])
+    train_records = [j for i in train_records_list for j in i]
+    cv_records = [j for i in cv_records_list for j in i]
+    test_records = [j for i in test_records_list for j in i]
 
     # conduct neural network
     global_step, input, output, target = get_neural_network()
@@ -95,26 +102,24 @@ def train():
                 target_data = np.reshape(get_labels(batch_records), [batch_size, n_label])
 
                 _ = sess.run(optimizer, feed_dict={input:input_data, target:target_data})
-                if iteration + 1 == iter_size:
+                if iteration % 10 == 0:
                     data_loss, train_summary = sess.run([loss, merged_summary], feed_dict={input:input_data, target:target_data})
-                    train_writer.add_summary(train_summary, global_step=(global_step.eval(sess) // iter_size))
-                    print("epoch #{}, loss = {}".format((global_step.eval(sess) // iter_size), data_loss))
+                    train_writer.add_summary(train_summary, global_step=(global_step.eval(sess)))
+                    print("epoch #{} iteration = {}, loss = {}".format((global_step.eval(sess) // iter_size), (global_step.eval(sess)), data_loss))
 
-            if (global_step.eval(sess) // iter_size) % 10 == 0:
-                batch_cv_records = get_random_segment(cv_records)
-                cv_summary = sess.run(merged_summary, feed_dict={
-                    input: np.reshape(get_features(batch_cv_records), [batch_size, n_input]),
-                    target: np.reshape(get_labels(batch_cv_records), [batch_size, n_label])})
-                cv_writer.add_summary(cv_summary, global_step=(global_step.eval(sess) // iter_size))
+                    batch_cv_records = get_random_segment(cv_records)
+                    cv_summary = sess.run(merged_summary, feed_dict={
+                        input: np.reshape(get_features(batch_cv_records), [batch_size, n_input]),
+                        target: np.reshape(get_labels(batch_cv_records), [batch_size, n_label])})
+                    cv_writer.add_summary(cv_summary, global_step=(global_step.eval(sess)))
 
-                batch_test_records = get_random_segment(test_records)
-                test_summary = sess.run(merged_summary, feed_dict={
-                    input: np.reshape(get_features(batch_test_records), [batch_size, n_input]),
-                    target: np.reshape(get_labels(batch_test_records), [batch_size, n_label])})
-                test_writer.add_summary(test_summary, global_step=(global_step.eval(sess) // iter_size))
+                    batch_test_records = get_random_segment(test_records)
+                    test_summary = sess.run(merged_summary, feed_dict={
+                        input: np.reshape(get_features(batch_test_records), [batch_size, n_input]),
+                        target: np.reshape(get_labels(batch_test_records), [batch_size, n_label])})
+                    test_writer.add_summary(test_summary, global_step=(global_step.eval(sess)))
 
-
-            if ((global_step.eval(sess) // iter_size) + 1) % 100 == 0:
+            if ((global_step.eval(sess) // iter_size) + 1) % 5 == 0:
                 saver.save(sess, CKPT_DIR, global_step=(global_step.eval(sess) // iter_size))
 
 
@@ -134,10 +139,18 @@ def get_neural_network():
 
 def transaction():
     origin_records = origin_data_reader.get_b50_records()
-    labeled_records = labeler.get_b50_feature_record(origin_records, DAYS, THRESHOLD)
-    labeled_records = labeled_records[1]
-    length = len(labeled_records)
-    test_records = labeled_records
+
+    # convert origin data to assembled data
+    labeled_records_list = labeler.get_b50_feature_record(origin_records, DAYS, THRESHOLD)
+    train_records_list = []
+    cv_records_list = []
+    test_records_list = []
+    for labeled_records in labeled_records_list:
+        length = len(labeled_records)
+        train_records_list.append(labeled_records[:int(0.6 * length)])
+        cv_records_list.append(labeled_records[int(0.6 * length):int(0.8 * length)])
+        test_records_list.append(labeled_records[int(0.8 * length):])
+    test_records = test_records_list[1]
 
     _global_step, input, _output, _target = get_neural_network()
     output = tf.nn.softmax(_output)
@@ -177,4 +190,4 @@ def predict():
             print("{}, {}, {}, {}, {}, {}".format(record.date, output_vector, np.argmax(output_vector), record.label, np.argmax(record.label), record.close))
 
 
-transaction()
+train()
