@@ -7,9 +7,9 @@ import labeler
 import origin_data_reader
 from checker.nn_market_checker import NnMarketChecker
 
-DAYS = 12
+DAYS = 26
 FEATURE_SIZE = 1
-THRESHOLD = 0.2
+THRESHOLD = 0.15
 n_input = FEATURE_SIZE * DAYS
 n_label = 3
 n_hidden_layer = 3
@@ -24,7 +24,7 @@ TRAIN_SUMMARY_DIR = SUMMARY_DIR+"/train"
 CV_SUMMARY_DIR = SUMMARY_DIR+"/cv"
 TEST_SUMMARY_DIR = SUMMARY_DIR+"/test"
 CKPT_DIR = './model/{}/{}/{}/'.format(FEATURE_SIZE, n_hidden_layer, n_hidden_unit)
-ACTUAL_CKPT_DIR = './model/4/5/5'
+ACTUAL_CKPT_DIR = CKPT_DIR
 
 
 def get_features(labeled_records):
@@ -150,7 +150,7 @@ def transaction():
         train_records_list.append(labeled_records[:int(0.6 * length)])
         cv_records_list.append(labeled_records[int(0.6 * length):int(0.8 * length)])
         test_records_list.append(labeled_records[int(0.8 * length):])
-    test_records = test_records_list[1]
+    test_records = test_records_list[3]
 
     _global_step, input, _output, _target = get_neural_network()
     output = tf.nn.softmax(_output)
@@ -190,4 +190,4 @@ def predict():
             print("{}, {}, {}, {}, {}, {}".format(record.date, output_vector, np.argmax(output_vector), record.label, np.argmax(record.label), record.close))
 
 
-train()
+transaction()
