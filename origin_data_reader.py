@@ -37,7 +37,7 @@ def get_balance_records(price_path='./data/daily_price.csv', balance_path='./dat
 
     balance_f = open(balance_path, 'r')
     price_records = get_origin_records(price_path)
-    price_records = {r.date:r for r in price_records}
+    price_records = {r.date: r for r in price_records}
 
     balance_df = pd.read_csv(balance_f)
     balance_values = balance_df.iloc[:,:].values

@@ -44,6 +44,7 @@ def layer(input, n_input, n_output):
     W = tf.Variable(tf.random_normal(shape=[n_input, n_output]))
     b = tf.Variable(tf.random_normal(shape=[n_output]))
     output = tf.add(tf.matmul(input, W), b)
+    output = tf.nn.relu(output)
     return output
 
 

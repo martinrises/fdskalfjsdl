@@ -1,26 +1,26 @@
 import urllib.request
 import csv
 
-data_indices = ['601328.XSHG', '600519.XSHG', '601688.XSHG', '601901.XSHG', '600030.XSHG', '601601.XSHG', '600016.XSHG', '601186.XSHG', '600485.XSHG', '601390.XSHG', '601800.XSHG', '601288.XSHG', '600606.XSHG', '600028.XSHG', '601318.XSHG', '600111.XSHG', '600048.XSHG', '601628.XSHG', '601818.XSHG', '600958.XSHG', '601766.XSHG', '600547.XSHG', '600036.XSHG', '601006.XSHG', '600000.XSHG', '601985.XSHG', '600999.XSHG', '601668.XSHG', '600887.XSHG', '601088.XSHG', '601198.XSHG', '601881.XSHG', '600104.XSHG', '601989.XSHG', '601398.XSHG', '600919.XSHG', '600029.XSHG', '601988.XSHG', '601857.XSHG', '600340.XSHG', '601169.XSHG', '600100.XSHG', '600518.XSHG', '600050.XSHG', '601166.XSHG', '601788.XSHG', '601229.XSHG', '601336.XSHG', '600837.XSHG', '601211.XSHG']
+data_indices = ['AG1306', 'AG1701', 'AG1603', 'AG1507', 'AG1808', 'AG1210', 'AG888', 'AG1801', 'AG1607', 'AG1411', 'AG1809', 'AG1305', 'AG1706', 'AG1307', 'AG1703', 'AG1802', 'AG1303', 'AG1606', 'AG1609', 'AG1404', 'AG1612', 'AG1509', 'AG1508', 'AG1608', 'AG1702', 'AG1501', 'AG1311', 'AG1602', 'AG1709', 'AG1408', 'AG1412', 'AG1610', 'AG1707', 'AG1804', 'AG1711', 'AG1512', 'AG1302', 'AG1601', 'AG1410', 'AG1805', 'AG1503', 'AG1312', 'AG1211', 'AG1407', 'AG1301', 'AG1504', 'AG1502', 'AG1209', 'AG1405', 'AG1705', 'AG99', 'AG1505', 'AG1605', 'AG1803', 'AG1304', 'AG1708', 'AG1401', 'AG1310', 'AG1403', 'AG1212', 'AG1402', 'AG88', 'AG1611', 'AG1406', 'AG1510', 'AG1807', 'AG1712', 'AG1308', 'AG1704', 'AG1309', 'AG1710', 'AG1506', 'AG1806', 'AG1604', 'AG1409', 'AG1511']
 
 
 def save_csv(filename, content_str):
-    with open('../data/b50/{}.csv'.format(filename), 'w', newline='') as f:
+    with open('../data/future/by/{}.csv'.format(filename), 'w', newline='') as f:
         f.write(content_str)
 
 
-headers = {"Accept":'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-           "Accept-Language": "zh-CN,en-US;q=0.8,en;q=0.6,de-DE;q=0.4,de;q=0.2,zh;q=0.2",
-           "Cache-Control": "max-age=0",
-           "Connection": "keep-alive",
-           "Cookie": "jupyter-hub-token-user_306589=\"2|1:0|10:1505374090|29:jupyter-hub-token-user_306589|44:ODRkN2QwOWY4ZjRlNDFlMWIyZWQ1Nzg1N2MxMTI3YTI=|48f93966c7ce950bff27e935ec994b77020388344f8b7affe215cf5333eb0315\"; gr_user_id=16ec036a-0bf8-45c0-bfd4-b6615672e98f; jupyter-hub-token-user_306589=\"2|1:0|10:1505368487|29:jupyter-hub-token-user_306589|44:ODRkN2QwOWY4ZjRlNDFlMWIyZWQ1Nzg1N2MxMTI3YTI=|baa71061c969c693fd62bb88756bc584e20e554135401d36a32e96a57ee3621a\"; jupyter-hub-token=\"2|1:0|10:1505368487|17:jupyter-hub-token|44:ODRkN2QwOWY4ZjRlNDFlMWIyZWQ1Nzg1N2MxMTI3YTI=|83517b83dd40909a9adf77adaa2a6a86440ac936268db067f44adee59c3ac691\"; connect.sid=s%3Ahx25Uvo0rtmPJ9lisZhZbheKHpbl1gVN.TesisdiuFcRnZZnCSwpSV%2BQREm4WztjfTeTOa%2BIptwg; tgw_l7_route=c54242301fc532aead997498daeb37fa; sid=b9baff27-a8e6-466b-8c83-a48160f9a04b|78a7ae8c016c35db67950ee6ac59055bc0e5f02966b09cba4c679423a31c9486ddb6ca47552210d5d1003352a0151fb03afc27c2863e1cc3f6043fe5ad37e5ba; Hm_lvt_cb81fd54150b99e25d085d58bbaf4a07=1504061859,1504148682,1505368426; Hm_lpvt_cb81fd54150b99e25d085d58bbaf4a07=1505378914; gr_session_id_9bc6807c25b59135=ceecf950-8401-4738-96f3-059a25e5bef2; gr_cs1_ceecf950-8401-4738-96f3-059a25e5bef2=user_id%3A306589",
-           "DNT": "1",
-           "Host": "www.ricequant.com",
-           "Upgrade-Insecure-Requests": "1",
-           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36"}
 
 for index in data_indices:
-    url = 'https://www.ricequant.com/research/user/user_306589/files/data/{}_daily_price.csv'.format(index)
+    headers = {"Host":'www.ricequant.com',
+           "Upgrade-Insecure-Requests": "1",
+           "Save-Data": "on",
+           "User-Agent": "Mozilla/5.0 (Linux; Android 7.0; SM-G9280 Build/NRD90M) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.98 Mobile Safari/537.36",
+           "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+           "DNT": "1",
+           "Referer": "https://www.ricequant.com/research/user/user_306589/edit/data/future/by/{}_daily_price.csv".format(index),
+           "Accept-Language": "zh-CN,en-US;q=0.8,en;q=0.6,de-DE;q=0.4,de;q=0.2,zh;q=0.2",
+           "Cookie": "jupyter-hub-token-user_306589=\"2|1:0|10:1507780502|29:jupyter-hub-token-user_306589|44:OWUzZjcxNmM5MGQ3NDViZWJlZmYyNDQyNjlmYjUxNWQ=|e5cd46be711b217b0899a5db0e8fe8ebe0e31629e033c06f8a1c73615630e87b\"; tgw_l7_route=d0bf4a9ab78d53762b596c0a48da8e7f; gr_user_id=5bfc743c-4b79-404c-8311-20cdf671e1e0; jupyter-hub-token=\"2|1:0|10:1507780502|17:jupyter-hub-token|44:OWUzZjcxNmM5MGQ3NDViZWJlZmYyNDQyNjlmYjUxNWQ=|b6335ed6cf4c19ad6146b06320cdf1d9d62d951de8b4c31884b08935a81611b9\"; jupyter-hub-token-user_306589=\"2|1:0|10:1507780502|29:jupyter-hub-token-user_306589|44:OWUzZjcxNmM5MGQ3NDViZWJlZmYyNDQyNjlmYjUxNWQ=|e5cd46be711b217b0899a5db0e8fe8ebe0e31629e033c06f8a1c73615630e87b\"; sid=6098a390-6e5b-452b-9f5c-fa17e4eebc2a|746a0a57664067d9a775f8172818e293fddf51966d61b5c88c5e1571e4732fe267c292ff20ce3678bc6160d8ec860dc8d5a5eb30d349840d537d559924387f3e; Hm_lvt_cb81fd54150b99e25d085d58bbaf4a07=1507780478; Hm_lpvt_cb81fd54150b99e25d085d58bbaf4a07=1507780541; gr_session_id_9bc6807c25b59135=8c241e1c-805d-460f-9d28-397eea3d2a22; gr_cs1_8c241e1c-805d-460f-9d28-397eea3d2a22=user_id%3A306589' --compressed 'https://www.ricequant.com/research/user/user_306589/files/data/future/by/AG1209_daily_price.csv?download=1"}
+    url = 'https://www.ricequant.com/research/user/user_306589/files/data/future/by/{}_daily_price.csv?download=1'.format(index)
     req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req) as response:
         response_str = response.read().decode('gbk', 'ignore')
