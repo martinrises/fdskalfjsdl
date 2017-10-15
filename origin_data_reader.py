@@ -63,3 +63,10 @@ def get_b50_records(path="./data/b50/"):
     for f_name in file_names:
         records.append(get_origin_records(path + f_name))
     return records
+
+def get_future_records(path="./data/future/by/"):
+    file_names = os.listdir(path)
+    records = {}
+    for f_name in file_names:
+        records[f_name] = get_origin_records(path + f_name)
+    return records

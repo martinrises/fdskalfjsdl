@@ -32,8 +32,13 @@ class LabeledData:
         features = []
 
         price_std = feature_records[-1].open
+        volume_std = feature_records[-1].volume
         for r in feature_records:
-            features.extend([r.close/price_std])
+            features.extend([r.close / price_std])
+            # features.extend([r.open / price_std])
+            # features.extend([r.high / price_std])
+            # features.extend([r.low / price_std])
+            # features.extend([r.volume / volume_std])
         return features
 
     @property
