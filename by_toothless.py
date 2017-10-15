@@ -66,12 +66,7 @@ def train():
     origin_records = origin_data_reader.get_future_records()
     labeled_records_list = labeler.get_future_feature_record(origin_records, DAYS, THRESHOLD)
     data = [j for i in labeled_records_list for j in i]
-
-    shuffle(data)
-
     test_records = data[-2000:]
-    cv_records = data[-4000: -len(test_records)]
-    train_records = data[:-4000]
 
     # conduct neural network
     global_step, input, output, target = get_neural_network()
@@ -96,6 +91,12 @@ def train():
             sess.run(tf.global_variables_initializer())
 
         for epoch in range(max_epoch):
+            non_test_records = data[:-len(test_records)]
+            shuffle(non_test_records)
+
+            cv_records = non_test_records[-2000:]
+            train_records = non_test_records[:-2000]
+
             iter_size = len(train_records) // batch_size
             for iteration in range(iter_size):
                 batch_records = train_records[iteration * batch_size: (iteration + 1) * batch_size]
