@@ -4,8 +4,9 @@ from random import shuffle
 import tensorflow as tf
 import numpy as np
 import random
+from checker.nn_market_checker import NnMarketChecker
 
-DAYS = 26
+DAYS = 12
 FEATURE_SIZE = 1
 THRESHOLD = 0.15
 n_input = FEATURE_SIZE * DAYS
@@ -66,16 +67,21 @@ def train():
     origin_records = origin_data_reader.get_future_records()
     labeled_records_list = labeler.get_future_feature_record(origin_records, DAYS, THRESHOLD)
     data = [j for i in labeled_records_list for j in i]
-    test_records = data[-2000:]
+    test_records = data[-2004:]
 
     # conduct neural network
     global_step, input, output, target = get_neural_network()
 
     loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=target, logits=output))
+
+    correct_prediction = tf.equal(tf.argmax(output, 1), tf.argmax(target, 1))
+    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss, global_step=global_step)
 
     with tf.name_scope("summary"):
         tf.summary.scalar("train_loss", loss)
+        tf.summary.scalar("accuracy", accuracy)
         merged_summary = tf.summary.merge_all()
 
     saver = tf.train.Saver()
@@ -104,7 +110,7 @@ def train():
                 input_data = np.reshape(get_features(batch_records), [batch_size, n_input])
                 target_data = np.reshape(get_labels(batch_records), [batch_size, n_label])
 
-                _ = sess.run(optimizer, feed_dict={input:input_data, target:target_data})
+                _ = sess.run(optimizer, feed_dict={input: input_data, target: target_data})
                 if iteration % 10 == 0:
                     data_loss, train_summary = sess.run([loss, merged_summary], feed_dict={input:input_data, target:target_data})
                     train_writer.add_summary(train_summary, global_step=(global_step.eval(sess)))
@@ -124,5 +130,35 @@ def train():
 
             if ((global_step.eval(sess) // iter_size) + 1) % 5 == 0:
                 saver.save(sess, CKPT_DIR, global_step=(global_step.eval(sess) // iter_size))
+
+
+def transaction():
+
+    # convert origin data to assembled data
+    origin_records = origin_data_reader.get_future_records()
+    labeled_records_list = labeler.get_future_feature_record(origin_records, DAYS, THRESHOLD)
+
+    test_records_list = labeled_records_list[64:]
+    print("transaction, len(test_records_list) = {}".format(len(test_records_list)))
+
+    _global_step, input, _output, _target = get_neural_network()
+    output = tf.nn.softmax(_output)
+    saver = tf.train.Saver()
+
+    with tf.Session() as sess:
+        ckpt = tf.train.get_checkpoint_state(ACTUAL_CKPT_DIR)
+        saver.restore(sess, ckpt.model_checkpoint_path)
+
+        for test_records in test_records_list:
+            checker = NnMarketChecker(test_records)
+            for i in range(0, len(test_records) - 2):
+                record = test_records[i]
+                actual_input = np.reshape(get_features([record]), [1, n_input])
+                output_vector = sess.run(output, feed_dict={input: actual_input})
+                print("{}, {}, {}, {}, {}, {}".format(record.date, output_vector, np.argmax(output_vector), record.label,
+                                                  np.argmax(record.label), record.close))
+                checker.on_day_triggerd(i, output_vector)
+            checker.finish(len(test_records) - 2)
+
 
 train()
